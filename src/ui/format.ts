@@ -21,7 +21,7 @@ function sup(n: number): string {
 /** Human distance from kilometres, choosing km / AU / light-years. */
 export function fmtDist(km: number): string {
   const a = Math.abs(km);
-  if (a < 1e7) return `${sig(km, 4)} km`;
+  if (a < 1e6) return `${sig(km, 4)} km`;
   if (a < 0.05 * AU_KM) return `${sig(km / 1e6, 3)} million km`;
   if (a < 0.1 * LY_KM) return `${sig(km / AU_KM, 3)} AU`;
   const ly = km / LY_KM;

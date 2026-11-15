@@ -289,7 +289,7 @@ export class StarField implements System {
     const radiusKm = entity.radiusKm;
     const mesh = new Mesh(this.sphere, new ShaderMaterial({
       vertexShader: STAR_VERT, fragmentShader: STAR_FRAG,
-      uniforms: { uTeff: { value: teff }, uTime: { value: 0 }, uGain: { value: 7 } },
+      uniforms: { uTeff: { value: teff }, uTime: { value: 0 }, uGain: { value: 1.25 } },
     }));
     mesh.scale.setScalar(radiusKm);
     mesh.frustumCulled = false;
@@ -400,7 +400,7 @@ export class StarField implements System {
     a.corona.position.copy(rel);
     a.corona.visible = px > 1.5;
     const cu = (a.corona.material as ShaderMaterial).uniforms;
-    cu.uPixelScale.value = ctx.pixelScale; cu.uAlpha.value = 1.6 * Math.min(1, px / 6);
+    cu.uPixelScale.value = ctx.pixelScale; cu.uAlpha.value = 0.55 * Math.min(1, px / 6);
     // glare billboard reproduces the catalogue point (which is hidden while the system is active)
     const dpc = Math.max(dist / PC_KM, 1e-12);
     const m = this.absMag(a.index) + 5 * Math.log10(dpc / 10);

@@ -129,7 +129,7 @@ export class SolarSystem implements System {
     if (def.kind === 'star') {
       b.material = new ShaderMaterial({
         vertexShader: STAR_VERT, fragmentShader: STAR_FRAG,
-        uniforms: { uTeff: { value: TSUN_K }, uTime: { value: 0 }, uGain: { value: 7 } },
+        uniforms: { uTeff: { value: TSUN_K }, uTime: { value: 0 }, uGain: { value: 1.25 } },
       });
       this.sun = b;
     } else {
@@ -391,7 +391,7 @@ export class SolarSystem implements System {
     this.sunCorona.visible = sunPx > 1.5;
     const cu = (this.sunCorona.material as ShaderMaterial).uniforms;
     cu.uPixelScale.value = ctx.pixelScale;
-    cu.uAlpha.value = 1.6 * Math.min(1, sunPx / 6);
+    cu.uAlpha.value = 0.55 * Math.min(1, sunPx / 6);
     // small bodies
     if (this.belt && this.beltMaterial) {
       const a = this.showBelt ? Math.min(1, Math.max(0, (0.012 - ctx.sunDistPc) / 0.008)) : 0;

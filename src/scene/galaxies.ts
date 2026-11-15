@@ -192,7 +192,14 @@ export class GalaxyField implements System {
 
   galaxyName(i: number): string {
     const m = this.meta.meta[i];
-    return m[2] || (m[1] ? `${m[1]}` : m[0]);
+    if (m[2]) return m[1] ? `${m[2]} (${m[1]})` : m[2];
+    return m[1] ? `${m[1]} \u00b7 ${m[0]}` : m[0];
+  }
+  commonName(i: number): string { return this.meta.meta[i][2]; }
+  /** short name for on-screen labels */
+  labelName(i: number): string {
+    const m = this.meta.meta[i];
+    return m[2] || m[1] || m[0];
   }
   searchText(i: number): string {
     const m = this.meta.meta[i];
@@ -263,7 +270,7 @@ export class GalaxyField implements System {
       const m = d[o + 7] + 5 * Math.log10(Math.max(dist, 1e-6) * 1e5);
       if (m > 10.2 && px < 6) continue;
       if (!ctx.project(_v, p)) continue;
-      add({ x: p.x, y: p.y, text: this.galaxyName(i), priority: 28 - m + (px > 8 ? 20 : 0), color: '#c9d6f2', resolve: () => this.galaxyEntity(i), offset: Math.min(50, Math.max(6, px * 0.7 + 4)), kind: 'galaxy', key: `g${i}` });
+      add({ x: p.x, y: p.y, text: this.labelName(i), priority: 28 - m + (px > 8 ? 20 : 0), color: '#c9d6f2', resolve: () => this.galaxyEntity(i), offset: Math.min(50, Math.max(6, px * 0.7 + 4)), kind: 'galaxy', key: `g${i}` });
     }
     if (scaleMpc > 4 && scaleMpc < 1500) {
       for (const e of this.clusterEntities) {

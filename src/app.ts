@@ -17,6 +17,29 @@ import type { ZeldovichResult } from './workers/zeldovich.worker';
 export interface SearchEntry { text: string; label: string; sub: string; weight: number; get: () => Entity | null }
 
 const YEAR_S = 365.25 * 86400;
+
+const GENITIVE: Record<string, string> = {
+  And: 'Andromedae', Ant: 'Antliae', Aps: 'Apodis', Aqr: 'Aquarii', Aql: 'Aquilae', Ara: 'Arae', Ari: 'Arietis', Aur: 'Aurigae', Boo: 'Bootis', Cae: 'Caeli',
+  Cam: 'Camelopardalis', Cnc: 'Cancri', CVn: 'Canum Venaticorum', CMa: 'Canis Majoris', CMi: 'Canis Minoris', Cap: 'Capricorni', Car: 'Carinae', Cas: 'Cassiopeiae',
+  Cen: 'Centauri', Cep: 'Cephei', Cet: 'Ceti', Cha: 'Chamaeleontis', Cir: 'Circini', Col: 'Columbae', Com: 'Comae Berenices', CrA: 'Coronae Australis',
+  CrB: 'Coronae Borealis', Crv: 'Corvi', Crt: 'Crateris', Cru: 'Crucis', Cyg: 'Cygni', Del: 'Delphini', Dor: 'Doradus', Dra: 'Draconis', Equ: 'Equulei', Eri: 'Eridani',
+  For: 'Fornacis', Gem: 'Geminorum', Gru: 'Gruis', Her: 'Herculis', Hor: 'Horologii', Hya: 'Hydrae', Hyi: 'Hydri', Ind: 'Indi', Lac: 'Lacertae', Leo: 'Leonis',
+  LMi: 'Leonis Minoris', Lep: 'Leporis', Lib: 'Librae', Lup: 'Lupi', Lyn: 'Lyncis', Lyr: 'Lyrae', Men: 'Mensae', Mic: 'Microscopii', Mon: 'Monocerotis', Mus: 'Muscae',
+  Nor: 'Normae', Oct: 'Octantis', Oph: 'Ophiuchi', Ori: 'Orionis', Pav: 'Pavonis', Peg: 'Pegasi', Per: 'Persei', Phe: 'Phoenicis', Pic: 'Pictoris', Psc: 'Piscium',
+  PsA: 'Piscis Austrini', Pup: 'Puppis', Pyx: 'Pyxidis', Ret: 'Reticuli', Sge: 'Sagittae', Sgr: 'Sagittarii', Sco: 'Scorpii', Scl: 'Sculptoris', Sct: 'Scuti',
+  Ser: 'Serpentis', Sex: 'Sextantis', Tau: 'Tauri', Tel: 'Telescopii', Tri: 'Trianguli', TrA: 'Trianguli Australis', Tuc: 'Tucanae', UMa: 'Ursae Majoris',
+  UMi: 'Ursae Minoris', Vel: 'Velorum', Vir: 'Virginis', Vol: 'Volantis', Vul: 'Vulpeculae',
+};
+const GREEK_FULL: Record<string, string> = { '\u03b1': 'alpha', '\u03b2': 'beta', '\u03b3': 'gamma', '\u03b4': 'delta', '\u03b5': 'epsilon', '\u03b6': 'zeta', '\u03b7': 'eta', '\u03b8': 'theta', '\u03b9': 'iota', '\u03ba': 'kappa', '\u03bb': 'lambda', '\u03bc': 'mu', '\u03bd': 'nu', '\u03be': 'xi', '\u03bf': 'omicron', '\u03c0': 'pi', '\u03c1': 'rho', '\u03c3': 'sigma', '\u03c4': 'tau', '\u03c5': 'upsilon', '\u03c6': 'phi', '\u03c7': 'chi', '\u03c8': 'psi', '\u03c9': 'omega' };
+
+/** Spell out a Bayer/Flamsteed designation so "alpha centauri" or "61 cygni" can be typed. */
+function spellDesignation(d: string): string {
+  const m = /^([\u03b1-\u03c9]|\d+)(\d*)\s+([A-Za-z]{3})$/.exec(d.trim());
+  if (!m) return d;
+  const first = GREEK_FULL[m[1]] ?? m[1];
+  const gen = GENITIVE[m[3]] ?? m[3];
+  return `${first} ${gen} ${first}${m[2]} ${gen} ${first} ${m[3]}`;
+}
 export const TIME_RATES: [number, string][] = [
   [1, 'real time'], [60, '1 minute / s'], [600, '10 minutes / s'], [3600, '1 hour / s'], [6 * 3600, '6 hours / s'], [86400, '1 day / s'],
   [7 * 86400, '1 week / s'], [30.4375 * 86400, '1 month / s'], [YEAR_S, '1 year / s'], [10 * YEAR_S, '10 years / s'], [100 * YEAR_S, '100 years / s'],
@@ -160,20 +183,24 @@ export class App {
     add('Milky Way', 'Our galaxy', 190, () => this.milkyway.entity, 'galaxy galactic centre');
     add('Observable Universe', 'Cosmology', 150, () => this.web.entity, 'cmb cosmic microwave background big bang');
     for (const e of this.galaxies.regions()) add(e.name, e.subtitle, 120, () => e);
-    const GREEK_FULL: Record<string, string> = { 'α': 'alpha', 'β': 'beta', 'γ': 'gamma', 'δ': 'delta', 'ε': 'epsilon', 'ζ': 'zeta', 'η': 'eta', 'θ': 'theta', 'ι': 'iota', 'κ': 'kappa', 'λ': 'lambda', 'μ': 'mu', 'ν': 'nu', 'ξ': 'xi', 'ο': 'omicron', 'π': 'pi', 'ρ': 'rho', 'σ': 'sigma', 'τ': 'tau', 'υ': 'upsilon', 'φ': 'phi', 'χ': 'chi', 'ψ': 'psi', 'ω': 'omega' };
     const seen = new Set<number>();
     for (const s of this.stars.namedStars()) {
       seen.add(s.i);
       const nm = this.stars.starName(s.i);
-      const alt = nm.alt.map((a) => a.replace(/[α-ω]/g, (g) => GREEK_FULL[g] + ' ')).join(' ') + ' ' + nm.alt.join(' ');
+      const alt = nm.alt.map(spellDesignation).join(' ') + ' ' + nm.alt.join(' ');
       add(s.name, 'Star', 80 - Math.min(20, s.i / 500), () => this.stars.starEntity(s.i), alt);
     }
     for (let i = 1; i < 6000; i++) {
       if (seen.has(i)) continue;
       const nm = this.stars.starName(i);
       if (/^(HIP|HYG|HD)/.test(nm.name)) continue;
-      add(nm.name, 'Star', 40 - i / 300, () => this.stars.starEntity(i), nm.name.replace(/[α-ω]/g, (g) => GREEK_FULL[g] + ' ') + ' ' + nm.alt.join(' '));
+      add(nm.name, 'Star', 40 - i / 300, () => this.stars.starEntity(i), spellDesignation(nm.name) + ' ' + nm.alt.join(' '));
     }
+    const ALIASES: Record<string, string> = {
+      'Rigil Kentaurus': 'Alpha Centauri A', Toliman: 'Alpha Centauri B', 'Proxima Centauri': 'Alpha Centauri C nearest star', Polaris: 'North Star pole star',
+      Sirius: 'Dog Star', "Barnard's Star": 'Barnard', Betelgeuse: 'Alpha Orionis', Vega: 'Alpha Lyrae', Antares: 'Alpha Scorpii',
+    };
+    for (const e of this.search) { const al = ALIASES[e.label]; if (al) { e.text += ' ' + al.toLowerCase(); this.byName.set(al.toLowerCase(), e.get); } }
     for (const h of this.stars.exoHosts()) {
       if (!seen.has(h.s)) add(h.n, `Star · ${h.p.length} planet${h.p.length > 1 ? 's' : ''}`, 35, () => this.stars.starEntity(h.s));
       h.p.forEach((row, k) => add(`${h.n} ${row[0]}`, 'Exoplanet', 30, () => this.stars.exoPlanetEntity(h.s, k)));
@@ -181,11 +208,16 @@ export class App {
     for (let i = 0; i < this.galaxies.count; i++) {
       const nm = this.galaxies.galaxyName(i);
       const txt = this.galaxies.searchText(i);
-      const named = !/^(NGC|IC) /.test(nm);
-      this.search.push({ text: txt, label: nm, sub: 'Galaxy', weight: named ? 70 : 10, get: () => this.galaxies.galaxyEntity(i) });
-      if (named && !this.byName.has(nm.toLowerCase())) this.byName.set(nm.toLowerCase(), () => this.galaxies.galaxyEntity(i));
+      const get = () => this.galaxies.galaxyEntity(i);
       const mm = /\bm(\d+)\b/.exec(txt);
-      if (mm) this.byName.set(`m${mm[1]}`, () => this.galaxies.galaxyEntity(i));
+      const named = !/^(NGC|IC) /.test(nm);
+      // the catalogue is sorted by luminosity, so earlier entries are the more prominent galaxies
+      const weight = (mm ? 115 : named ? 70 : 10) - (20 * i) / this.galaxies.count;
+      this.search.push({ text: txt, label: nm, sub: 'Galaxy', weight, get });
+      const common = this.galaxies.commonName(i);
+      if (common && !this.byName.has(common.toLowerCase())) this.byName.set(common.toLowerCase(), get);
+      if (named && !this.byName.has(nm.toLowerCase())) this.byName.set(nm.toLowerCase(), get);
+      if (mm) this.byName.set(`m${mm[1]}`, get);
     }
   }
 

@@ -162,7 +162,9 @@ export function zeldovich(req: ZeldovichRequest): ZeldovichResult {
   for (let o = 0; o < n3; o++) {
     const i = order[o];
     const x = i % n, y = Math.floor(i / n) % n, z = Math.floor(i / (n * n));
-    q[o * 3] = (x + 0.5) * cell - L / 2; q[o * 3 + 1] = (y + 0.5) * cell - L / 2; q[o * 3 + 2] = (z + 0.5) * cell - L / 2;
+    // Jitter the Lagrangian positions within their cell so the unperturbed particle load is not a
+    // visible lattice at early times (the displacement field is smooth on the cell scale).
+    q[o * 3] = (x + rnd()) * cell - L / 2; q[o * 3 + 1] = (y + rnd()) * cell - L / 2; q[o * 3 + 2] = (z + rnd()) * cell - L / 2;
     psiOut[o * 3] = psi[i * 3]; psiOut[o * 3 + 1] = psi[i * 3 + 1]; psiOut[o * 3 + 2] = psi[i * 3 + 2];
     // trilinear sample of the density at the particle's displaced position
     const fx = px[i * 3] - 0.5, fy = px[i * 3 + 1] - 0.5, fz = px[i * 3 + 2] - 0.5;
