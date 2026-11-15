@@ -1,0 +1,25 @@
+{
+  "name": "universe-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive, scientifically grounded 3D simulation of the universe from planetary to cosmological scales.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "data": "python3 tools/build_data.py"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}
