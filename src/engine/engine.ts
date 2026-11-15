@@ -126,7 +126,7 @@ export class Engine {
     this.cosmic = mk('cosmic', MPC_KM, new Vector3(), 1e-6, 1e6);
     this.galactic = mk('galactic', PC_KM, new Vector3(), 1e-6, 1e9);
     this.stellar = mk('stellar', PC_KM, new Vector3(), 1e-9, 1e7);
-    this.near = mk('near', 1, new Vector3(), 0.05, 1e17);
+    this.near = mk('near', 1, new Vector3(), 0.05, 1e19);
 
     const rt = new WebGLRenderTarget(4, 4, { type: HalfFloatType, samples: quality.msaa, depthBuffer: true });
     this.composer = new EffectComposer(this.renderer, rt);

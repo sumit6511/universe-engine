@@ -75,7 +75,7 @@ export class StarField implements System {
   material: ShaderMaterial;
   constellations: LineSegments | null = null;
   showConstellations = true;
-  magLimit = 6.5;
+  magLimit = 6.3;
   private entities = new Map<number, Entity>();
   private exoByStar = new Map<number, ExoHost>();
   private exoPlanetEntities = new Map<string, Entity>();
@@ -122,11 +122,11 @@ export class StarField implements System {
           vec3 c = blackbody(bvToTeff(aMag.y));
           float l = dot(c, vec3(0.3, 0.55, 0.15));
           c = max(mix(vec3(l), c, 1.35), 0.0);                        // modest saturation boost so colours read on screen
-          vColor = c * min(inten, 5.0) * uGain;
-          gl_PointSize = min(size, 72.0 * uPixelRatio);
+          vColor = c * min(inten, 2.2) * uGain;
+          gl_PointSize = min(size, 24.0 * uPixelRatio);
           gl_Position = projectionMatrix * mv;
           gl_Position.z = 0.0;
-          if (b < 0.12) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+          if (b < 0.2) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         }`,
       fragmentShader: /* glsl */ `
         varying vec3 vColor;
@@ -316,7 +316,7 @@ export class StarField implements System {
         const pm = new Mesh(this.sphere, new ShaderMaterial({
           vertexShader: BODY_VERT, fragmentShader: BODY_FRAG, defines: { PROCEDURAL: style.type },
           uniforms: {
-            uMap: { value: null }, uRingMap: { value: null }, uTint: { value: style.color }, uRegolith: { value: style.type <= 2 ? 0.6 : 0 }, uLight: { value: 1.45 },
+            uMap: { value: null }, uRingMap: { value: null }, uTint: { value: style.color }, uRegolith: { value: style.type <= 2 ? 0.6 : 0 }, uLight: { value: 1.1 },
             uTime: { value: 0 }, uSeed: { value: hash(index + k * 17.0) * 10 }, uTemp: { value: row[7] ?? 0 }, uOblate: { value: new Vector3(1, 1, 1) },
             uSunPos: { value: new Vector3() }, uSunRadius: { value: radiusKm },
             uOcc: { value: [new Vector4(), new Vector4(), new Vector4(), new Vector4()] }, uOccCount: { value: 0 },
@@ -357,6 +357,13 @@ export class StarField implements System {
 
   get activeIndex(): number { return this.active ? this.active.index : -1; }
 
+  /** Star and planets of the close-up system, for picking. */
+  activeBodies(): { entity: Entity; rel: Vector3; radiusKm: number }[] {
+    const a = this.active;
+    if (!a) return [];
+    return [{ entity: a.entity, rel: a.rel, radiusKm: a.radiusKm }, ...a.planets.map((p) => ({ entity: p.entity, rel: p.rel, radiusKm: p.radiusKm }))];
+  }
+
   // ------------------------------------------------------------------ frame
   simulate(jd: number): void {
     this.jd = jd;
@@ -377,10 +384,10 @@ export class StarField implements System {
     this.camPc.copy(ctx.rig.anchor).addScaledVector(ctx.rig.local, 1 / PC_KM);
     if (this.constellations) {
       const cu = (this.constellations.material as ShaderMaterial).uniforms;
-      const fade = Math.min(1, Math.max(0, 1 - (ctx.sunDistPc - 30) / 400));
+      const fade = Math.min(1, Math.max(0, 1 - Math.log10(Math.max(ctx.sunDistPc, 1) / 6) / 1.3));
       this.constellations.visible = this.showConstellations && fade > 0.01;
       cu.uMyr.value = this.myr;
-      cu.uAlpha.value = 0.42 * fade;
+      cu.uAlpha.value = 0.36 * fade;
     }
     const a = this.active;
     if (!a) return;
@@ -402,8 +409,8 @@ export class StarField implements System {
     a.glare.position.copy(rel);
     a.glare.visible = b > 0.12 && px < 40;
     gu.uPixelScale.value = ctx.pixelScale;
-    gu.uMinPx.value = Math.min(72, 1.3 + 1.15 * Math.pow(b, 0.27)) * ctx.pixelRatio * 0.9;
-    gu.uAlpha.value = Math.min(5, b < 1 ? b * b * 0.7 : 0.7 + 0.5 * Math.log10(b)) * 0.5 * Math.min(1, Math.max(0, (40 - px) / 20));
+    gu.uMinPx.value = Math.min(30, 1.3 + 1.15 * Math.pow(b, 0.27)) * ctx.pixelRatio * 0.9;
+    gu.uAlpha.value = Math.min(2.6, b < 1 ? b * b * 0.7 : 0.7 + 0.5 * Math.log10(b)) * 0.5 * Math.min(1, Math.max(0, (40 - px) / 20));
     const systemAlpha = Math.min(1, Math.max(0, (0.05 - dpc) / 0.03));
     for (let k = 0; k < a.planets.length; k++) {
       const p = a.planets[k];

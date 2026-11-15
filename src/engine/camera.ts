@@ -8,7 +8,7 @@ import { Quaternion, Vector3 } from 'three';
 import { MPC_KM, PC_KM } from '../core/constants';
 import type { Entity } from './entity';
 
-const MAX_DIST_KM = 3.2e4 * MPC_KM; // ~32 Gpc
+const MAX_DIST_KM = 4.6e4 * MPC_KM; // ~46 Gpc: room to see the whole observable universe
 const _v = new Vector3();
 const _d = new Vector3();
 const _qy = new Quaternion();

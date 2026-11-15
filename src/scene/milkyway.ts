@@ -141,14 +141,14 @@ export class MilkyWay implements System {
     };
 
     // --- bar and boxy bulge (old, cool stars) ---------------------------------------------
-    const nBulge = Math.floor(N * 0.17);
+    const nBulge = Math.floor(N * 0.13);
     const ba = 27 * DEG;
     const ex: [number, number] = [-Math.cos(ba), Math.sin(ba)], ey: [number, number] = [-Math.sin(ba), -Math.cos(ba)];
     for (let k = 0; k < nBulge; k++) {
       const long = rnd() < 0.4;
       const a = gauss() * (long ? 2.1 : 0.9), b = gauss() * (long ? 0.42 : 0.55), z = gauss() * (long ? 0.16 : 0.42);
       const x = a * ex[0] + b * ey[0], y = a * ex[1] + b * ey[1];
-      put(x, y, z, 3900 + 900 * rnd(), 0.75 + 0.5 * rnd(), 160 + 160 * rnd());
+      put(x, y, z, 3900 + 900 * rnd(), 0.3 + 0.25 * rnd(), 160 + 160 * rnd());
     }
     // --- smooth thin + thick disc ----------------------------------------------------------
     const nDisk = Math.floor(N * 0.36);
@@ -225,7 +225,7 @@ export class MilkyWay implements System {
           float d = max(length(mv.xyz), 1e-3);
           float px = aSize / d * uPixelScale;                 // true diameter in device pixels
           float s = max(px, 1.7 * uPixelRatio);
-          float flux = (px / s) * (px / s);                    // unresolved: conserve flux
+          float flux = pow(px / s, 1.6);                       // unresolved: (nearly) conserve flux
           float fade = smoothstep(uNearFade * 0.4, uNearFade * 1.6, d) * (1.0 - smoothstep(uMaxPx * 0.5, uMaxPx, s));
           vColor = color * uGain * flux * fade;
           gl_PointSize = min(s, uMaxPx);
@@ -301,7 +301,10 @@ export class MilkyWay implements System {
     const dGC = this.v.copy(ctx.rig.anchor).addScaledVector(ctx.rig.local, 1 / PC_KM).sub(GALACTIC_CENTER_PC).length();
     const scalePc = ctx.distKm / PC_KM;
     const outside = Math.min(1, Math.max(0, Math.log10(Math.max(scalePc, 1) / 150) / 1.5));
-    u.uGain.value = (0.045 + 0.075 * outside) * (0.6 + 0.4 * Math.min(1, dGC / 20000));
+    // far away the galaxy shrinks to a few pixels: lift it so the Local Group stays readable
+    const far = 1 + 3.5 * Math.min(1, Math.max(0, Math.log10(Math.max(scalePc, 1) / 1.5e5) / 1.2));
+    u.uGain.value = (0.0045 + 0.075 * outside * outside) * (0.6 + 0.4 * Math.min(1, dGC / 20000)) * far;
+    u.uMaxPx.value = (70 + 150 * outside) * ctx.pixelRatio;
     u.uNearFade.value = 250 + 250 * outside;
     this.points.visible = dGC < 4e8; // beyond ~400 Mpc it is far below a pixel
   }

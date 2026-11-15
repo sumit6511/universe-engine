@@ -145,7 +145,7 @@ export class SolarSystem implements System {
           uNight: { value: def.id === 'earth' ? this.tex('earth_night.jpg') : this.blank },
           uClouds: { value: def.id === 'earth' ? this.tex('earth_clouds.jpg', false) : this.blank },
           uRingMap: { value: this.blank },
-          uTint: { value: tint }, uRegolith: { value: def.regolith }, uLight: { value: 1.45 }, uTime: { value: 0 }, uSeed: { value: def.radius % 7.3 },
+          uTint: { value: tint }, uRegolith: { value: def.regolith }, uLight: { value: 1.1 }, uTime: { value: 0 }, uSeed: { value: def.radius % 7.3 },
           uTemp: { value: 0 },
           uOblate: { value: new Vector3(1, 1 / (polar * polar), 1) },
           uSunPos: { value: new Vector3() }, uSunRadius: { value: 695700 },
@@ -215,7 +215,7 @@ export class SolarSystem implements System {
         uniforms: {
           uRingMap: { value: map }, uSunPos: { value: new Vector3() }, uSunRadius: { value: 695700 }, uCenter: { value: new Vector3() },
           uPole: { value: new Vector3(0, 1, 0) }, uTint: { value: new Color(...rg.color) }, uPlanetRadius: { value: def.radius },
-          uPolarRatio: { value: polar }, uRingInner: { value: rg.inner }, uRingOuter: { value: rg.outer }, uLight: { value: 1.5 },
+          uPolarRatio: { value: polar }, uRingInner: { value: rg.inner }, uRingOuter: { value: rg.outer }, uLight: { value: 1.15 },
         },
       });
       b.ring = new Mesh(geo, mat);
@@ -262,7 +262,7 @@ export class SolarSystem implements System {
       col.set([base.r * f, base.g * f, base.b * f], i * 3);
     }
     geo.setAttribute('color', new Float32BufferAttribute(col, 3));
-    const mat = new LineBasicMaterial({ vertexColors: true, transparent: true, blending: AdditiveBlending, depthWrite: false, opacity: 0.8 });
+    const mat = new LineBasicMaterial({ vertexColors: true, transparent: true, blending: AdditiveBlending, depthWrite: false, opacity: 0.6 });
     b.orbit = new Line(geo, mat);
     b.orbit.frustumCulled = false;
     this.engine.near.scene.add(b.orbit);
@@ -401,6 +401,7 @@ export class SolarSystem implements System {
       u.uDays.value = jd - this.beltEpoch;
       u.uAlpha.value = a;
       u.uPixelRatio.value = ctx.pixelRatio;
+      u.uPixelScale.value = ctx.pixelScale;
       // dim the swarm when the camera is deep inside it so individual points do not dominate
       u.uScaleAU.value = ctx.distKm / AU_KM;
     }
@@ -418,12 +419,12 @@ export class SolarSystem implements System {
     if (b.def.kind === 'moon') alpha *= 0.75;
     if (b.def.kind !== 'planet' && b.def.kind !== 'moon') alpha *= 0.6;
     // very large on screen: keep the trail as a faint guide only
-    alpha *= Math.min(1, Math.max(0.22, 1.25 - 0.3 * Math.log10(Math.max(px, 1) / 1500)));
+    alpha *= Math.min(1, Math.max(0.07, 1.2 - 0.42 * Math.log10(Math.max(px, 1) / 1200)));
     // fade the head of the trail out when we are right next to the body
     alpha *= Math.min(1, Math.max(0.0, 1.2 - b.px / 260));
     line.visible = alpha > 0.01;
     if (!line.visible) return;
-    (line.material as LineBasicMaterial).opacity = alpha;
+    (line.material as LineBasicMaterial).opacity = alpha * 0.62;
     const pos = (line.geometry.getAttribute('position') as BufferAttribute);
     const arr = pos.array as Float32Array;
     const P = b.orbitPeriod;
@@ -464,11 +465,11 @@ export class SolarSystem implements System {
     this.beltEpoch = meta.epoch;
     this.beltMaterial = new ShaderMaterial({
       transparent: true, depthWrite: false, blending: AdditiveBlending,
-      uniforms: { uSunRel: { value: new Vector3() }, uDays: { value: 0 }, uAlpha: { value: 1 }, uPixelRatio: { value: 1 }, uScaleAU: { value: 1 } },
+      uniforms: { uSunRel: { value: new Vector3() }, uDays: { value: 0 }, uAlpha: { value: 1 }, uPixelRatio: { value: 1 }, uScaleAU: { value: 1 }, uPixelScale: { value: 1000 } },
       vertexShader: /* glsl */ `
         ${LOGDEPTH_VERT_PARS}
         attribute vec3 aEl2; attribute vec2 aCls;
-        uniform vec3 uSunRel; uniform float uDays; uniform float uPixelRatio; uniform float uScaleAU;
+        uniform vec3 uSunRel; uniform float uDays; uniform float uPixelRatio; uniform float uScaleAU; uniform float uPixelScale;
         varying vec3 vColor;
         void main(){
           float a = position.x, e = position.y, inc = position.z;
@@ -484,6 +485,9 @@ export class SolarSystem implements System {
           vColor = cls < 0.5 ? vec3(0.86, 0.78, 0.66) : cls < 1.5 ? vec3(0.62, 0.80, 0.62) : cls < 2.5 ? vec3(1.0, 0.55, 0.38) : cls < 3.5 ? vec3(0.55, 0.85, 0.85) : vec3(0.62, 0.74, 1.0);
           float bright = clamp(1.25 - (aCls.y - 3.0) / 14.0, 0.25, 1.0);
           vColor *= bright * mix(0.35, 0.8, smoothstep(0.5, 6.0, uScaleAU / max(a, 0.3)));
+          // when the whole swarm shrinks to a few pixels, dim it so thousands of points do not add up to a white blob
+          float orbitPx = a * ${AU_KM.toFixed(1)} / max(length(world), 1.0) * uPixelScale;
+          vColor *= clamp(orbitPx / 420.0, 0.02, 1.0);
           gl_PointSize = (cls > 2.5 ? 2.0 : 1.5) * uPixelRatio * (0.8 + bright * 0.7);
           gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
           ${LOGDEPTH_VERT}
