@@ -70,7 +70,38 @@
     <label class="range">Detail
       <select id="set-quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select>
     </label>
+    <button id="btn-about" type="button">About and data sources</button>
     <p class="settings-note" id="set-stats"></p>
+  </section>
+
+  <section id="about" hidden>
+    <button id="about-close" type="button" aria-label="Close">×</button>
+    <div class="info-sub">About</div>
+    <h2>What is real here</h2>
+    <dl class="about-list">
+      <dt>Measured</dt>
+      <dd>Positions, motions and colours of 113,000 stars; 10,000 galaxies with sizes, tilts and types; 6,400 exoplanets; orbits of the planets, 23 moons and 40,000 small bodies; surface maps of planets and moons.</dd>
+      <dt>Computed from physics</dt>
+      <dd>Day and night, seasons, eclipses and ring shadows; atmospheric scattering; star temperatures and sizes; light bending around black holes; growth of cosmic structure; N-body dynamics in the gravity lab.</dd>
+      <dt>Modelled or illustrative</dt>
+      <dd>The Milky Way’s far side, galaxy close-ups, exoplanet appearances and orbit orientations, the cosmic web beyond the galaxy catalogue, and the CMB pattern. Each is marked in its details panel.</dd>
+    </dl>
+    <h2>Accuracy</h2>
+    <p>Planet positions agree with JPL Horizons to a few arcminutes (1800–2050), the Moon to 0.3°, major moons to 1–3°. Cosmology is flat ΛCDM with Planck 2018 parameters.</p>
+    <h2>Data and credits</h2>
+    <ul class="about-credits">
+      <li><b>Stars:</b> HYG Database 4.1, David Nash (CC BY-SA 4.0), from Hipparcos, Gaia, Yale BSC and Gliese.</li>
+      <li><b>Galaxies:</b> OpenNGC, Mattia Verga (CC BY-SA 4.0).</li>
+      <li><b>Exoplanets:</b> NASA Exoplanet Archive, operated by Caltech under contract with NASA.</li>
+      <li><b>Orbits:</b> NASA/JPL Solar System Dynamics: planetary elements, Horizons, Small-Body Database.</li>
+      <li><b>Planet maps:</b> Solar System Scope (CC BY 4.0), based on NASA imagery.</li>
+      <li><b>Moon and Pluto maps:</b> NASA/JPL-Caltech/SSI/LPI (Cassini), NASA/JHUAPL/SwRI (New Horizons), NASA/JPL/USGS (Io, Triton), Björn Jónsson (Ganymede).</li>
+      <li><b>Constellation figures:</b> d3-celestial, Olaf Frohn (BSD-3).</li>
+      <li><b>Models:</b> Reid et al. 2019 (spiral arms), Planck Collaboration 2018, Eisenstein &amp; Hu 1998, Zel’dovich 1970, Toomre &amp; Toomre 1972, Ballesteros 2012, Kopparapu et al. 2013, Sudarsky et al. 2000.</li>
+      <li><b>Rendering:</b> three.js (MIT).</li>
+    </ul>
+    <h2>Keys</h2>
+    <p class="about-keys"><kbd>/</kbd> search · <kbd>space</kbd> pause · <kbd>,</kbd> <kbd>.</kbd> time rate · <kbd>+</kbd> <kbd>−</kbd> zoom · <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> orbit · <kbd>L</kbd> labels · <kbd>H</kbd> hide interface</p>
   </section>
 
   <section id="tour" hidden>
@@ -92,6 +123,8 @@
       <button id="time-faster" type="button" title="Faster (.)" aria-label="Faster">+</button>
     </div>
   </footer>
+
+  <div id="perf" hidden><span>Running slowly on this device.</span><button id="perf-lower" type="button">Lower detail</button><button id="perf-dismiss" type="button" aria-label="Dismiss">×</button></div>
 
   <p id="hint">Drag to orbit · scroll or pinch to zoom · click anything to travel there</p>
 

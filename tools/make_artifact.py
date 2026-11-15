@@ -4,7 +4,7 @@ Turn the Vite production build (dist/) into a publishable single-page bundle (ar
 a page fragment with inlined CSS plus the script, data and texture files it loads by
 relative URL.  Also writes artifact/files.json, the published-path -> source-path map.
 """
-import json, os, re, shutil
+import base64, json, os, re, shutil
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
@@ -26,6 +26,7 @@ page = f'''{title}
 {css}
 </style>
 {body}
+<script>window.UE_B64 = true;</script>
 <script type="module" src="{script}"></script>
 '''
 shutil.rmtree(OUT, ignore_errors=True)
@@ -35,6 +36,14 @@ files = {}
 for sub in ('assets', 'data', 'textures'):
     for fn in sorted(os.listdir(os.path.join(DIST, sub))):
         if fn.endswith('.css'):
+            continue
+        if fn.endswith('.bin'):
+            # raw binary is not a served type: ship it as base64 text
+            os.makedirs(os.path.join(OUT, sub), exist_ok=True)
+            name = fn[:-4] + '.b64.txt'
+            with open(os.path.join(DIST, sub, fn), 'rb') as f, open(os.path.join(OUT, sub, name), 'wb') as g:
+                g.write(base64.b64encode(f.read()))
+            files[f'{sub}/{name}'] = f'artifact/{sub}/{name}'
             continue
         files[f'{sub}/{fn}'] = f'dist/{sub}/{fn}'
 json.dump(files, open(os.path.join(OUT, 'files.json'), 'w'), indent=1)

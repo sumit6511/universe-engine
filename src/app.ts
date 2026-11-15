@@ -66,7 +66,21 @@ export class App {
     const total = 9;
     const tick = (msg: string) => progress(++done / (total + 2), msg);
     const j = async (u: string, msg: string) => { const r = await fetch(base + u); if (!r.ok) throw new Error(`Could not load ${u} (${r.status})`); const v = await r.json(); tick(msg); return v; };
-    const b = async (u: string, msg: string) => { const r = await fetch(base + u); if (!r.ok) throw new Error(`Could not load ${u} (${r.status})`); const v = await r.arrayBuffer(); tick(msg); return v; };
+    // Hosts that cannot serve raw binary get the same bytes as base64 text (see tools/make_artifact.py).
+    const b64 = (globalThis as any).UE_B64 === true;
+    const b = async (u: string, msg: string): Promise<ArrayBuffer> => {
+      const r = await fetch(base + (b64 ? u.replace(/\.bin$/, '.b64.txt') : u));
+      if (!r.ok) throw new Error(`Could not load ${u} (${r.status})`);
+      let v: ArrayBuffer;
+      if (b64) {
+        const bin = atob((await r.text()).trim());
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        v = bytes.buffer;
+      } else v = await r.arrayBuffer();
+      tick(msg);
+      return v;
+    };
     const [starBin, starMeta, hip, exo, cons, sbBin, sbMeta, galBin, galMeta] = await Promise.all([
       b('data/stars.bin', 'Star catalogue: 113,000 stars'), j('data/stars_meta.json', 'Star names'), b('data/stars_hip.bin', 'Hipparcos identifiers'),
       j('data/exoplanets.json', 'Exoplanet archive: 6,400 planets'), j('data/constellations.json', 'Constellation figures'),

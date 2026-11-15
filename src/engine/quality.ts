@@ -26,8 +26,21 @@ export const QUALITY: Record<Quality['name'], Quality> = {
 export function pickQuality(): Quality {
   const q = new URLSearchParams(location.search).get('q') ?? (() => { try { return localStorage.getItem('ue.quality'); } catch { return null; } })();
   if (q && q in QUALITY) return QUALITY[q as Quality['name']];
-  const mobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
-  const cores = navigator.hardwareConcurrency || 4;
-  if (mobile) return QUALITY.low;
-  return cores >= 8 ? QUALITY.high : QUALITY.medium;
+  if (/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) return QUALITY.low;
+  // discrete or Apple-silicon GPUs get the high preset; everything else starts at medium
+  let gpu = '';
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2');
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+    if (gl && ext) gpu = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL));
+  } catch { /* renderer string unavailable */ }
+  if (/SwiftShader|llvmpipe|Software/i.test(gpu)) return QUALITY.low;
+  return /NVIDIA|GeForce|RTX|Radeon (RX|Pro)|Apple M\d|Arc\(TM\) A/i.test(gpu) ? QUALITY.high : QUALITY.medium;
+}
+
+/** The next preset down, or null at the bottom. */
+export function lowerQuality(q: Quality): Quality | null {
+  const order: Quality['name'][] = ['low', 'medium', 'high', 'ultra'];
+  const i = order.indexOf(q.name);
+  return i > 0 ? QUALITY[order[i - 1]] : null;
 }

@@ -6,7 +6,7 @@ import { AU_KM, KPC_KM, MPC_KM, PC_KM, jdToCalendar } from '../core/constants';
 import type { FrameContext } from '../engine/engine';
 import type { Entity } from '../engine/entity';
 import type { LabelSpec } from '../engine/labels';
-import { QUALITY } from '../engine/quality';
+import { QUALITY, lowerQuality } from '../engine/quality';
 import { fmtDist, fmtParsec, sig } from './format';
 import { TOUR, type TourStep } from './tour';
 
@@ -144,6 +144,7 @@ export class UI {
     $('settings').hidden = true;
     $('btn-settings').setAttribute('aria-expanded', 'false');
     $('search-results').hidden = true;
+    $('about').hidden = true;
   }
 
   // ------------------------------------------------------------------ search
@@ -228,11 +229,20 @@ export class UI {
     q.value = app.quality.name;
     q.onchange = () => {
       if (!(q.value in QUALITY)) return;
-      try { localStorage.setItem('ue.quality', q.value); } catch { /* storage unavailable: applies to this load only */ }
-      const u = new URL(location.href); u.searchParams.set('q', q.value);
-      location.replace(u.toString());
+      this.reloadWithQuality(q.value);
     };
     $('btn-lab').onclick = () => this.onLab?.();
+    $('btn-about').onclick = () => { $('about').hidden = false; panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    $('about-close').onclick = () => { $('about').hidden = true; };
+  }
+  /** Remember the detail level and restart. Storage is preferred: some hosts drop query strings. */
+  private reloadWithQuality(name: string): void {
+    let stored = false;
+    try { localStorage.setItem('ue.quality', name); stored = localStorage.getItem('ue.quality') === name; } catch { /* fall through to the URL */ }
+    const u = new URL(location.href);
+    if (stored) { u.searchParams.delete('q'); if (u.toString() === location.href) { location.reload(); return; } }
+    else u.searchParams.set('q', name);
+    location.replace(u.toString());
   }
   onLab: (() => void) | null = null;
   /** when set (gravity lab), pointer gestures drive this instead of the universe camera */
@@ -423,12 +433,29 @@ export class UI {
     this.frameCount++; this.fpsTime += dt;
     if (this.fpsTime > 1) {
       this.fps = this.frameCount / this.fpsTime; this.frameCount = 0; this.fpsTime = 0;
+      this.watchPerformance();
       if (!$('settings').hidden) {
         const w = app.web.stats;
         $('set-stats').textContent = `${this.fps.toFixed(0)} fps · ${app.quality.name}${w.n ? ` · web ${w.n}³, σ=${w.sigma.toFixed(2)}` : ''}`;
       }
     }
     this.updateLabels(ctx);
+  }
+
+  /** Offer a lower detail level after several consecutive slow seconds. */
+  private slowSeconds = 0;
+  private perfAsked = false;
+  private watchPerformance(): void {
+    if (this.perfAsked || document.hidden) return;
+    this.slowSeconds = this.fps < 17 ? this.slowSeconds + 1 : 0;
+    const lower = lowerQuality(this.app.quality);
+    if (this.slowSeconds < 5 || !lower) return;
+    this.perfAsked = true;
+    $('perf').hidden = false;
+    $('perf-dismiss').onclick = () => { $('perf').hidden = true; };
+    $('perf-lower').onclick = () => {
+      this.reloadWithQuality(lower.name);
+    };
   }
 
   private updateLabels(ctx: FrameContext): void {

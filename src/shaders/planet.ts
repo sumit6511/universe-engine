@@ -168,7 +168,7 @@ void main(){
   float clouds = texture2D(uClouds, uv).r;
   float ocean = smoothstep(0.02, 0.10, albedo.b - max(albedo.r, albedo.g * 0.82)) * step(dot(albedo, vec3(0.333)), 0.35);
   vec3 H = normalize(L + V);
-  float spec = pow(max(dot(N, H), 0.0), 120.0) * 1.6 + pow(max(dot(N, H), 0.0), 18.0) * 0.12;
+  float spec = pow(max(dot(N, H), 0.0), 260.0) * 0.85 + pow(max(dot(N, H), 0.0), 40.0) * 0.07;
   float fres = pow(1.0 - mu, 5.0);
   col += vec3(1.0, 0.95, 0.85) * (spec + fres * 0.06 * mu0) * ocean * (1.0 - clouds) * step(0.0, ndl) * shadow * uLight;
   col = mix(col, vec3(1.0) * (0.25 + 0.75 * mu0) * mu0 * shadow * uLight * 0.95, clamp(clouds * clouds * 1.25, 0.0, 1.0));
