@@ -12,6 +12,8 @@ npm test           # physics validation (25 tests, incl. comparison with JPL Hor
 npm run build      # production bundle in dist/
 ```
 
+Live: https://sumit6511.github.io/universe-engine/ (deployed from `main` by `.github/workflows/pages.yml`).
+
 Requires WebGL 2. Detail level: `?q=low|medium|high|ultra` or the View menu.
 
 ## What is in it
