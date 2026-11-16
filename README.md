@@ -33,6 +33,10 @@ Requires WebGL 2. Detail level: `?q=low|medium|high|ultra` or the View menu.
 | Guides | Habitable zones (Sun and every exoplanet host), reach of human radio signals | Kopparapu et al. 2013 |
 | Gravity lab | GPU N-body: galaxy encounters (restricted three-body) and a self-gravitating cluster (direct summation) | Toomre & Toomre 1972 |
 
+The app opens in its classic mode. The **Advanced** button in the top bar turns on the
+spacecraft, habitable zones and radio bubble, targeting HUD, cinematic lens, relativistic
+flight and shareable links; the choice is remembered per browser.
+
 ## Architecture
 
 ```

@@ -77,7 +77,7 @@ export class UI {
     // hover: find what is under the cursor a few times a second
     let hoverAt = 0;
     canvas.addEventListener('pointermove', (ev) => {
-      if (pts.size || ev.pointerType === 'touch' || this.controller) return;
+      if (pts.size || ev.pointerType === 'touch' || this.controller || !this.app.advanced) return;
       const now = performance.now();
       if (now - hoverAt < 110) return;
       hoverAt = now;
@@ -249,6 +249,10 @@ export class UI {
       $('warp-detail').textContent = `time dilation \u00d7${sig(gamma, 3)} \u00b7 sky ahead blueshifted \u00d7${sig(gamma * (1 + beta), 3)}`;
     });
     $('btn-share').onclick = () => this.share();
+    $('btn-advanced').onclick = () => this.setAdvanced(!app.advanced);
+    let stored = false;
+    try { stored = localStorage.getItem('ue.advanced') === '1'; } catch { /* storage unavailable */ }
+    this.setAdvanced(stored || location.hash.startsWith('#at/'), false);
     rng('set-mag', (v) => (app.stars.magLimit = v));
     rng('set-exposure', (v) => (app.engine.exposure = v));
     rng('set-bloom', (v) => { app.engine.bloom.strength = v; app.engine.bloom.enabled = v > 0.01; });
@@ -271,6 +275,27 @@ export class UI {
     else u.searchParams.set('q', name);
     location.replace(u.toString());
   }
+  /** Switch between the classic experience and the advanced feature set. */
+  setAdvanced(on: boolean, remember = true): void {
+    const app = this.app;
+    app.advanced = on;
+    const checked = (id: string) => $<HTMLInputElement>(id).checked;
+    app.craft.show = on && checked('set-craft');
+    app.guides.show = on && checked('set-guides');
+    app.engine.lens.enabled = on && checked('set-lens');
+    const beta = $<HTMLInputElement>('set-beta');
+    if (!on) beta.value = '0';
+    beta.dispatchEvent(new Event('input'));
+    $('adv-settings').hidden = !on;
+    const b = $('btn-advanced');
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = on ? 'Advanced \u00b7 on' : 'Advanced';
+    if (!on) { this.hoverEntity = null; this.app.engine.canvas.style.cursor = ''; }
+    // leaving advanced mode while parked on a probe: go home
+    if (!on && app.engine.rig.target.kind === 'spacecraft') { const sun = app.find('Sun'); if (sun) app.goTo(sun, 85 * AU_KM); }
+    if (remember) { try { localStorage.setItem('ue.advanced', on ? '1' : '0'); } catch { /* not remembered */ } }
+  }
+
   private async share(): Promise<void> {
     const u = new URL(location.href);
     u.hash = this.app.viewState();
@@ -517,6 +542,7 @@ export class UI {
       el.style.transform = `translate3d(${Math.round(p.x - half)}px, ${Math.round(p.y - half)}px, 0)`;
       return true;
     };
+    if (!this.app.advanced) { $('reticle').hidden = true; $('hover').hidden = true; return; }
     const target = ctx.rig.target;
     const ret = $('reticle');
     place(ret, target.kind === 'region' ? null : target, 15);

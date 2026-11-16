@@ -26,6 +26,7 @@
     <nav class="actions">
       <button id="btn-tour" type="button">Grand tour</button>
       <button id="btn-lab" type="button">Gravity lab</button>
+      <button id="btn-advanced" type="button" aria-pressed="false" title="Relativistic flight, spacecraft, habitable zones, targeting HUD, cinematic lens">Advanced</button>
       <button id="btn-settings" type="button" aria-expanded="false">View</button>
     </nav>
   </header>
@@ -64,18 +65,20 @@
     <label><input id="set-const" type="checkbox" checked> Constellations</label>
     <label><input id="set-belt" type="checkbox" checked> Asteroids and Kuiper belt</label>
     <label><input id="set-web" type="checkbox" checked> Simulated cosmic web</label>
+    <div id="adv-settings" hidden>
     <label><input id="set-craft" type="checkbox" checked> Spacecraft</label>
     <label><input id="set-guides" type="checkbox" checked> Habitable zones, radio bubble</label>
     <label><input id="set-lens" type="checkbox" checked> Cinematic lens</label>
     <label class="range">Your speed <input id="set-beta" type="range" min="0" max="1000" step="1" value="0"></label>
     <p class="settings-note" id="set-beta-read">at rest · drag to fly at near light speed</p>
+    <button id="btn-share" type="button">Copy link to this view</button>
+    </div>
     <label class="range">Star brightness <input id="set-mag" type="range" min="4.5" max="9" step="0.1" value="6.3"></label>
     <label class="range">Exposure <input id="set-exposure" type="range" min="0.4" max="2.2" step="0.05" value="1"></label>
     <label class="range">Glow <input id="set-bloom" type="range" min="0" max="1.4" step="0.05" value="0.55"></label>
     <label class="range">Detail
       <select id="set-quality"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select>
     </label>
-    <button id="btn-share" type="button">Copy link to this view</button>
     <button id="btn-about" type="button">About and data sources</button>
     <p class="settings-note" id="set-stats"></p>
   </section>

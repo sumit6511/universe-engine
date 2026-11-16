@@ -268,13 +268,16 @@ export class App {
     }
   }
 
+  /** Classic mode is the original experience; advanced adds spacecraft, guides, HUD, lens and relativistic flight. */
+  advanced = false;
+
   query(q: string, limit = 9): SearchEntry[] {
     q = q.trim().toLowerCase();
     if (!q) return [];
     const scored: { e: SearchEntry; s: number }[] = [];
     for (const e of this.search) {
       const i = e.text.indexOf(q);
-      if (i < 0) continue;
+      if (i < 0 || (!this.advanced && e.sub === 'Spacecraft')) continue;
       const lab = e.label.toLowerCase();
       let s = e.weight;
       if (lab === q) s += 1000;
