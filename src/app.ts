@@ -13,6 +13,7 @@ import { MilkyWay } from './scene/milkyway';
 import { SolarSystem } from './scene/solar';
 import { StarField } from './scene/stars';
 import { Guides, Spacecraft } from './scene/extras';
+import { DeepSky } from './scene/deepsky';
 import type { ZeldovichResult } from './workers/zeldovich.worker';
 
 export interface SearchEntry { text: string; label: string; sub: string; weight: number; get: () => Entity | null }
@@ -73,6 +74,7 @@ export class App {
   galaxies!: GalaxyField;
   web!: CosmicWeb;
   craft!: Spacecraft;
+  deepsky!: DeepSky;
   guides!: Guides;
   /** entities that are not recreated on demand, by id (for shareable links) */
   private fixed = new Map<string, Entity>();
@@ -127,8 +129,9 @@ export class App {
     this.web = new CosmicWeb(e);
     this.craft = new Spacecraft(e, this.solar);
     this.guides = new Guides(e, this.solar, this.stars);
-    e.systems.push(this.solar, this.craft, this.stars, this.guides, this.milkyway, this.galaxies, this.web);
-    this.labelSystems.push(this.solar as LabelSystem, this.stars as LabelSystem, this.milkyway as LabelSystem, this.galaxies as LabelSystem, this.web as LabelSystem, this.craft as LabelSystem, this.guides as LabelSystem);
+    this.deepsky = new DeepSky(e);
+    e.systems.push(this.solar, this.craft, this.stars, this.guides, this.deepsky, this.milkyway, this.galaxies, this.web);
+    this.labelSystems.push(this.solar as LabelSystem, this.stars as LabelSystem, this.milkyway as LabelSystem, this.galaxies as LabelSystem, this.web as LabelSystem, this.craft as LabelSystem, this.guides as LabelSystem, this.deepsky as LabelSystem);
     progress(0.95, 'Indexing');
     this.buildSearch();
     this.solar.simulate(this.clock.jd);
@@ -229,6 +232,7 @@ export class App {
     add('Milky Way', 'Our galaxy', 190, () => this.milkyway.entity, 'galaxy galactic centre');
     add('Observable Universe', 'Cosmology', 150, () => this.web.entity, 'cmb cosmic microwave background big bang');
     for (const e of this.galaxies.regions()) { add(e.name, e.subtitle, 120, () => e); this.fixed.set(e.id, e); }
+    for (const o of this.deepsky.objects) { add(o.def.name, o.entity.subtitle, 75, () => o.entity, `${o.def.alt ?? ''} nebula cluster deep sky`); this.fixed.set(o.entity.id, o.entity); }
     for (const c of this.craft.craft) { add(c.def.name, 'Spacecraft', 140, () => c.entity, 'probe spacecraft nasa'); this.fixed.set(c.entity.id, c.entity); }
     const seen = new Set<number>();
     for (const s of this.stars.namedStars()) {
@@ -277,7 +281,7 @@ export class App {
     const scored: { e: SearchEntry; s: number }[] = [];
     for (const e of this.search) {
       const i = e.text.indexOf(q);
-      if (i < 0 || (!this.advanced && e.sub === 'Spacecraft')) continue;
+      if (i < 0 || (!this.advanced && (e.sub === 'Spacecraft' || e.weight === 75))) continue;
       const lab = e.label.toLowerCase();
       let s = e.weight;
       if (lab === q) s += 1000;
@@ -309,6 +313,8 @@ export class App {
     for (const b of this.stars.activeBodies()) consider(b.entity, b.rel, b.radiusKm, true);
     if (ctx.sunDistPc < 0.06) for (const b of this.craft.bodies()) consider(b.entity, b.rel, b.radiusKm, true);
     if (best) return best;
+    const dso = this.deepsky.pick(ctx, x, y);
+    if (dso) return dso;
     const scaleKpc = ctx.distKm / KPC_KM;
     const star = scaleKpc < 40 ? this.stars.pick(ctx, x, y) : null;
     const gal = scaleKpc > 0.5 || !star ? this.galaxies.pick(ctx, x, y) : null;

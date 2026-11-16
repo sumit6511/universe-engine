@@ -241,6 +241,7 @@ export class UI {
     chk('set-web', (v) => (app.web.enabled = v));
     chk('set-craft', (v) => (app.craft.show = v));
     chk('set-guides', (v) => (app.guides.show = v));
+    chk('set-dso', (v) => (app.deepsky.show = v));
     chk('set-lens', (v) => { app.engine.lens.enabled = v; });
     // speed slider: beta = 1 - 10^(-4 x), so the top of the range reaches 0.9999 c
     rng('set-beta', (v) => {
@@ -323,6 +324,7 @@ export class UI {
     LIVE.value = on ? 1 : 0;
     app.craft.show = on && checked('set-craft');
     app.guides.show = on && checked('set-guides');
+    app.deepsky.show = on && checked('set-dso');
     app.engine.lens.enabled = on && checked('set-lens');
     const beta = $<HTMLInputElement>('set-beta');
     if (!on) beta.value = '0';
