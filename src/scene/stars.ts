@@ -320,7 +320,7 @@ export class StarField implements System {
           vertexShader: BODY_VERT, fragmentShader: BODY_FRAG, defines: { PROCEDURAL: style.type },
           uniforms: {
             uMap: { value: null }, uRingMap: { value: null }, uTint: { value: style.color }, uRegolith: { value: style.type <= 2 ? 0.6 : 0 }, uLight: { value: 1.1 },
-            uTime: { value: 0 }, uSeed: { value: hash(index + k * 17.0) * 10 }, uTemp: { value: row[7] ?? 0 }, uOblate: { value: new Vector3(1, 1, 1) },
+            uTime: { value: 0 }, uSeed: { value: hash(index + k * 17.0) * 10 }, uTemp: { value: row[7] ?? 0 }, uLive: { value: 0 }, uOblate: { value: new Vector3(1, 1, 1) },
             uSunPos: { value: new Vector3() }, uSunRadius: { value: radiusKm },
             uOcc: { value: [new Vector4(), new Vector4(), new Vector4(), new Vector4()] }, uOccCount: { value: 0 },
             uCenter: { value: new Vector3() }, uPole: { value: new Vector3(0, 1, 0) }, uRingInner: { value: 0 }, uRingOuter: { value: 1 },

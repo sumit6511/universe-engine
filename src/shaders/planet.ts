@@ -69,7 +69,9 @@ uniform sampler2D uRingMap;
 #ifdef EARTH
 uniform sampler2D uNight;
 uniform sampler2D uClouds;
+uniform mat4 modelMatrix;
 #endif
+uniform float uLive;       // 1 = animated weather, cloud shadows and aurorae (advanced mode)
 varying vec3 vObj;
 varying vec3 vWorld;
 varying vec3 vNormalW;
@@ -146,7 +148,19 @@ void main(){
   vec3 albedo = proceduralAlbedo(d);
 #else
   vec2 uv = sphereUV(d);
+#ifdef GASGIANT
+  // Zonal winds: alternating east-west jets advect the cloud map. Two phases of the same flow are
+  // cross-faded so the shear never accumulates (speeds are exaggerated to be visible).
+  float jet = sin(d.y * 19.0) * 0.6 + sin(d.y * 7.0 + 1.3) * 0.4;
+  float cyc = uTime * 0.03 * uLive;
+  float p1 = fract(cyc), p2 = fract(cyc + 0.5);
+  float swirl = snoise(vec3(d.xz * 9.0, d.y * 30.0 + cyc)) * 0.0012 * uLive;
+  vec3 ga = texture2D(uMap, vec2(uv.x + jet * 0.03 * (p1 - 0.5), uv.y + swirl)).rgb;
+  vec3 gb = texture2D(uMap, vec2(uv.x + jet * 0.03 * (p2 - 0.5), uv.y + swirl)).rgb;
+  vec3 albedo = mix(ga, gb, abs(p1 - 0.5) * 2.0) * uTint;
+#else
   vec3 albedo = texture2D(uMap, uv).rgb * uTint;
+#endif
 #endif
 
   float shadow = eclipses(vWorld);
@@ -165,7 +179,16 @@ void main(){
   vec3 col = albedo * diffuse * shadow * uLight;
 
 #ifdef EARTH
-  float clouds = texture2D(uClouds, uv).r;
+  // clouds drift slowly eastward relative to the ground
+  vec2 cuv = uv + vec2(uTime * 0.0005 * uLive, 0.0);
+  float clouds = texture2D(uClouds, cuv).r;
+  // cloud shadows: look up the cloud deck a little way toward the Sun
+  vec3 Lo = normalize(transpose(mat3(modelMatrix)) * L);
+  vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), d) + vec3(0.0, 0.0, 1e-5));
+  vec3 north = cross(d, east);
+  float cosLat = max(sqrt(1.0 - d.y * d.y), 0.2);
+  vec2 suv = cuv + vec2(dot(Lo, east) / (6.2832 * cosLat), dot(Lo, north) / 3.1416) * 0.006;
+  col *= 1.0 - 0.5 * uLive * texture2D(uClouds, suv).r * (1.0 - clouds);
   float ocean = smoothstep(0.02, 0.10, albedo.b - max(albedo.r, albedo.g * 0.82)) * step(dot(albedo, vec3(0.333)), 0.35);
   vec3 H = normalize(L + V);
   float spec = pow(max(dot(N, H), 0.0), 260.0) * 0.85 + pow(max(dot(N, H), 0.0), 40.0) * 0.07;
@@ -175,6 +198,11 @@ void main(){
   float night = 1.0 - smoothstep(-0.12, 0.06, ndl);
   vec3 lights = texture2D(uNight, uv).rgb;
   col += lights * lights * vec3(1.0, 0.82, 0.55) * 1.6 * (night + (1.0 - shadow) * step(0.0, ndl)) * (1.0 - clouds * 0.75);
+  // aurorae: ovals ~23 degrees from the geomagnetic poles (80.7N 72.7W and its antipode)
+  float ml = abs(dot(d, vec3(0.0481, 0.9869, 0.1543)));
+  float oval = exp(-pow((ml - 0.9205) / 0.016, 2.0));
+  float curtain = 0.45 + 0.55 * snoise(vec3(d * 38.0 + vec3(0.0, uTime * 0.25, 0.0)));
+  col += vec3(0.12, 1.0, 0.42) * oval * max(curtain, 0.0) * night * 0.55 * uLive;
 #endif
   gl_FragColor = vec4(col, 1.0);
 }

@@ -199,7 +199,9 @@ export class Guides implements System {
   update(ctx: FrameContext): void {
     const fade = (rel: Vector3, outer: number) => {
       const px = (outer / Math.max(rel.length(), outer * 0.05)) * ctx.pixelScale;
-      return this.show ? Math.min(1, Math.max(0, (px - 30) / 60)) * Math.min(1, Math.max(0, (9000 - px) / 4000)) : 0;
+      // fade out when the view is zoomed in well inside the band (we would be looking through it edge-on)
+      const wide = Math.min(1, Math.max(0, (ctx.distKm / outer - 0.12) / 0.5));
+      return this.show ? Math.min(1, Math.max(0, (px - 30) / 60)) * Math.min(1, Math.max(0, (9000 - px) / 4000)) * wide : 0;
     };
     const sunRel = this.solar.sun.rel;
     const a = fade(sunRel, this.sunRing.userData.outer) * Math.min(1, Math.max(0, (0.06 - ctx.sunDistPc) / 0.04));

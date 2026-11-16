@@ -29,6 +29,9 @@ const _v2 = new Vector3();
 const _m = new Matrix4();
 const _x = new Vector3(), _y = new Vector3(), _z = new Vector3();
 
+/** Shared switch for animated weather, cloud shadows and aurorae. */
+export const LIVE = { value: 0 };
+
 export interface SmallBodiesMeta { count: number; stride: number; epoch: number; named: (SmallBodyElements & { name: string; kind: string; radius: number })[] }
 
 export class Body {
@@ -137,6 +140,7 @@ export class SolarSystem implements System {
       if (def.id === 'earth') defines.EARTH = 1;
       if (def.procedural) defines.PROCEDURAL = def.procedural === 'rock' ? 1 : def.procedural === 'ice' ? 2 : 3;
       if (def.ring) defines.RING_SHADOW = 1;
+      if (['jupiter', 'saturn', 'uranus', 'neptune'].includes(def.id)) defines.GASGIANT = 1;
       const tint = def.procedural ? new Color(def.color) : new Color(1, 1, 1);
       b.material = new ShaderMaterial({
         vertexShader: BODY_VERT, fragmentShader: BODY_FRAG, defines,
@@ -146,7 +150,7 @@ export class SolarSystem implements System {
           uClouds: { value: def.id === 'earth' ? this.tex('earth_clouds.jpg', false) : this.blank },
           uRingMap: { value: this.blank },
           uTint: { value: tint }, uRegolith: { value: def.regolith }, uLight: { value: 1.1 }, uTime: { value: 0 }, uSeed: { value: def.radius % 7.3 },
-          uTemp: { value: 0 },
+          uTemp: { value: 0 }, uLive: LIVE,
           uOblate: { value: new Vector3(1, 1 / (polar * polar), 1) },
           uSunPos: { value: new Vector3() }, uSunRadius: { value: 695700 },
           uOcc: { value: [new Vector4(), new Vector4(), new Vector4(), new Vector4()] }, uOccCount: { value: 0 },

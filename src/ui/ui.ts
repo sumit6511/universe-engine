@@ -1,3 +1,4 @@
+import { LIVE } from '../scene/solar';
 import { Vector3 } from 'three';
 // DOM user interface: labels, search, scale ruler, readouts, info panel, time controls, tour.
 
@@ -319,6 +320,7 @@ export class UI {
     const app = this.app;
     app.advanced = on;
     const checked = (id: string) => $<HTMLInputElement>(id).checked;
+    LIVE.value = on ? 1 : 0;
     app.craft.show = on && checked('set-craft');
     app.guides.show = on && checked('set-guides');
     app.engine.lens.enabled = on && checked('set-lens');
