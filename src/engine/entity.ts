@@ -3,7 +3,7 @@ import { PC_KM } from '../core/constants';
 
 export type EntityKind =
   | 'star' | 'planet' | 'dwarf' | 'moon' | 'asteroid' | 'comet' | 'exoplanet'
-  | 'blackhole' | 'galaxy' | 'cluster' | 'region';
+  | 'blackhole' | 'galaxy' | 'cluster' | 'region' | 'spacecraft';
 
 export interface InfoRow { k: string; v: string; hint?: string }
 export interface InfoData {

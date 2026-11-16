@@ -28,6 +28,9 @@ Requires WebGL 2. Detail level: `?q=low|medium|high|ultra` or the View menu.
 | Black holes | Sgr A*, M87*, Cygnus X-1 with per-pixel Schwarzschild geodesics and a relativistic thin disc | GRAVITY 2022, EHT 2019, Miller-Jones 2021 |
 | Galaxies | 10,168 NGC/IC galaxies and Local Group dwarfs in 3D | OpenNGC |
 | Cosmic web | ΛCDM realisation, tiled to the particle horizon, on our past light cone; scrubbable structure formation | Planck 2018, Eisenstein & Hu 1998, Zel'dovich 1970 |
+| Spacecraft | Voyager 1 and 2, Pioneer 10 and 11, New Horizons at their real positions | JPL Horizons state vectors |
+| Relativistic flight | Aberration, Doppler shift and beaming of the whole sky at up to 0.9999 c | Special relativity |
+| Guides | Habitable zones (Sun and every exoplanet host), reach of human radio signals | Kopparapu et al. 2013 |
 | Gravity lab | GPU N-body: galaxy encounters (restricted three-body) and a self-gravitating cluster (direct summation) | Toomre & Toomre 1972 |
 
 ## Architecture
@@ -66,7 +69,10 @@ A single float cannot hold both a planet's surface and a galaxy cluster, so:
   shrink below a pixel their brightness falls instead, so surface brightness is consistent at
   every zoom level.
 
-Post-processing is HDR (half-float targets), bloom, and ACES tone mapping.
+Post-processing is HDR (half-float targets), bloom, an optional cinematic lens pass
+(anamorphic streaks, chromatic aberration, vignette, grain) and ACES tone mapping.
+
+Shareable links encode the view in the URL hash: `#at/<entity id>/<ln distance km>/<yaw>/<pitch>/<Julian date>`.
 
 ## Physics and validation
 
@@ -93,6 +99,12 @@ temperature profile; intensity scales as g⁴T⁴ with g the product of Doppler 
 gravitational shifts. The background is a cube map of the actual surrounding scene.
 
 ## Known limitations
+
+* The relativistic view moves along the line of sight and applies to stars, the Milky Way and
+  galaxies; solid bodies are not warped. Colour temperature shifts exactly by the Doppler factor,
+  but brightness is compressed (true beaming goes as D⁴ and would saturate the display).
+* Spacecraft positions are a straight-line extrapolation of a 2026 state vector, so each probe
+  is hidden before roughly twelve years after its launch.
 
 * Planet elements are valid for 3000 BC – 3000 AD; outside that span the orbit shapes are
   frozen and only the mean longitude advances.

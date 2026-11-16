@@ -16,7 +16,7 @@ import type { Engine, FrameContext, System } from '../engine/engine';
 import { Entity } from '../engine/entity';
 import type { AddLabel } from '../engine/labels';
 import { AGE_NOW_GYR, COSMO, HORIZON_MPC, LAST_SCATTERING_MPC, ageAt, comovingDistance, growthFactor, redshiftAtDistance } from '../physics/cosmology';
-import { NOISE } from '../shaders/common';
+import { NOISE, REL, RELATIVITY } from '../shaders/common';
 import { sig } from '../ui/format';
 import type { ZeldovichResult } from '../workers/zeldovich.worker';
 
@@ -55,9 +55,10 @@ export class CosmicWeb implements System {
       transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending,
       uniforms: {
         uPixelScale: { value: 1000 }, uPixelRatio: { value: 1 }, uGain: { value: 1 }, uD: { value: 1 }, uLightCone: { value: 1 },
-        uGrowth: { value: growth }, uForm: { value: form }, uFog: { value: 1000 }, uLocalDim: { value: 1 }, uSplat: { value: 1.5 }, uFocus: { value: 100 },
+        uGrowth: { value: growth }, uForm: { value: form }, uFog: { value: 1000 }, uLocalDim: { value: 1 }, uSplat: { value: 1.5 }, uFocus: { value: 100 }, uBeta: REL.uBeta,
       },
       vertexShader: /* glsl */ `
+        ${RELATIVITY}
         attribute vec3 aPsi; attribute float aDens; attribute vec4 iOffset; attribute vec4 iSym;
         uniform float uPixelScale, uPixelRatio, uGain, uD, uLightCone, uFog, uLocalDim, uSplat, uFocus;
         uniform float uGrowth[${LUT_N}]; uniform float uForm[${LUT_N}];
@@ -86,13 +87,14 @@ export class CosmicWeb implements System {
           float r = length(x);
           float formed = mix(1.0, lut(uForm, r), uLightCone) * smoothstep(${HORIZON_MPC.toFixed(1)}, ${(LAST_SCATTERING_MPC - 300).toFixed(1)}, r);
           vec4 mv = modelViewMatrix * vec4(x, 1.0);
+          float zv = -mv.z;
           float d = max(length(mv.xyz), 1e-6);
+          float dop; mv.xyz = aberrate(mv.xyz, dop);
           // each splat stands for iOffset.w particles: slightly larger, considerably brighter
           float px = uSplat * pow(iOffset.w, 0.12) / d * uPixelScale;
           float s = max(px, 1.5 * uPixelRatio);
           float flux = pow(px / s, 1.5) * pow(iOffset.w, 0.62);
           // depth cue: emphasise a slab through the focus so filaments are not lost in projection
-          float zv = -mv.z;
           float slab = exp(-pow((zv - uFocus) / (0.3 * uFocus), 2.0));
           float fog = mix(0.07, 1.0, slab) / (1.0 + (d / uFog) * (d / uFog));
           // colour by local density: voids dim blue, filaments blue-white, cluster nodes warm
@@ -101,7 +103,7 @@ export class CosmicWeb implements System {
           c = mix(c, vec3(1.0, 0.86, 0.62), smoothstep(0.55, 1.0, t));
           float lum = 0.10 + 2.2 * t * t * t;
           float local = mix(uLocalDim, 1.0, smoothstep(40.0, 260.0, r));
-          vColor = c * lum * flux * fog * formed * local * uGain;
+          vColor = c * lum * flux * fog * formed * local * uGain * dopplerTint(dop);
           gl_PointSize = min(s, 48.0 * uPixelRatio);
           gl_Position = projectionMatrix * mv;
           gl_Position.z = 0.0;

@@ -23,7 +23,9 @@ async function boot(): Promise<void> {
 
   // deep links: #saturn, #m31 ...
   const fromHash = () => {
-    const name = decodeURIComponent(location.hash.slice(1)).replace(/-/g, ' ');
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (h.startsWith('at/')) { app.applyViewState(h); return; }
+    const name = h.replace(/-/g, ' ');
     const e = name ? app.find(name) : null;
     if (e) app.goTo(e);
   };

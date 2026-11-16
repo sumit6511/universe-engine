@@ -192,6 +192,7 @@ class BlackHoles implements System {
       e.color = 0xffc98a;
       e.getInfo = () => this.info(def, e, rs);
       this.holes.push({ def, entity: e, rsKm: rs, rel: new Vector3() });
+      app.registerEntity(e);
       app.addSearch({ text: `${def.name} black hole ${def.id === 'sgra' ? 'sgr a* galactic centre' : ''}`.toLowerCase(), label: def.name, sub: 'Black hole', weight: 185, get: () => e });
     }
     app.engine.systems.push(this);

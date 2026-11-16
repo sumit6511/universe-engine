@@ -17,6 +17,7 @@ import type { Engine, FrameContext, System } from '../engine/engine';
 import { Entity } from '../engine/entity';
 import type { AddLabel } from '../engine/labels';
 import { blackbodyRGB } from '../physics/stellar';
+import { REL, RELATIVITY } from '../shaders/common';
 
 interface ArmDef { name: string; betaK: number; Rk: number; psiIn: number; psiOut: number; range: [number, number]; width: number; weight: number; extend: boolean }
 
@@ -215,19 +216,21 @@ export class MilkyWay implements System {
     geo.setAttribute('aSize', new BufferAttribute(size, 1));
     this.material = new ShaderMaterial({
       transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending, vertexColors: true,
-      uniforms: { uPixelScale: { value: 1000 }, uPixelRatio: { value: 1 }, uGain: { value: 1 }, uNearFade: { value: 400 }, uMaxPx: { value: 220 } },
+      uniforms: { uPixelScale: { value: 1000 }, uPixelRatio: { value: 1 }, uGain: { value: 1 }, uNearFade: { value: 400 }, uMaxPx: { value: 220 }, uBeta: REL.uBeta },
       vertexShader: /* glsl */ `
+        ${RELATIVITY}
         attribute float aSize;
         uniform float uPixelScale, uPixelRatio, uGain, uNearFade, uMaxPx;
         varying vec3 vColor;
         void main(){
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           float d = max(length(mv.xyz), 1e-3);
+          float dop; mv.xyz = aberrate(mv.xyz, dop);
           float px = aSize / d * uPixelScale;                 // true diameter in device pixels
           float s = max(px, 1.7 * uPixelRatio);
           float flux = pow(px / s, 1.6);                       // unresolved: (nearly) conserve flux
           float fade = smoothstep(uNearFade * 0.4, uNearFade * 1.6, d) * (1.0 - smoothstep(uMaxPx * 0.5, uMaxPx, s));
-          vColor = color * uGain * flux * fade;
+          vColor = color * uGain * flux * fade * dopplerTint(dop);
           gl_PointSize = min(s, uMaxPx);
           gl_Position = projectionMatrix * mv;
           gl_Position.z = 0.0;

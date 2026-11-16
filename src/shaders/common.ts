@@ -54,6 +54,41 @@ vec3 blackbody(float T){
 float bvToTeff(float bv){ return 4600.0*(1.0/(0.92*bv+1.7)+1.0/(0.92*bv+0.62)); }
 `;
 
+/** Shared uniform: observer speed as a fraction of c (relativistic flight view). */
+export const REL = { uBeta: { value: 0 } };
+
+/**
+ * Special-relativistic optics for an observer moving along the view direction (-z in view space).
+ * aberrate() maps a rest-frame source position to its apparent position and returns the Doppler
+ * factor D = gamma (1 + beta cos(theta)).  Colour temperature scales exactly as D.  True flux
+ * scales as D^4, which would saturate any display, so brightness is compressed to D^1.5 / gamma.
+ */
+export const RELATIVITY = /* glsl */ `
+uniform float uBeta;
+vec3 aberrate(vec3 p, out float dop){
+  dop = 1.0;
+  if (uBeta < 1e-5) return p;
+  float d = length(p); vec3 n = p / max(d, 1e-30);
+  float c = -n.z;
+  float g = inversesqrt(1.0 - uBeta * uBeta);
+  float cp = (c + uBeta) / (1.0 + uBeta * c);
+  dop = g * (1.0 + uBeta * c);
+  float pl = length(n.xy);
+  float sp = sqrt(max(0.0, 1.0 - cp * cp));
+  vec3 m = pl > 1e-6 ? vec3(n.xy * (sp / pl), -cp) : vec3(0.0, 0.0, -sign(cp));
+  return m * d;
+}
+// display-compressed beaming (see above)
+float relExposure(float dop){
+  return uBeta < 1e-5 ? 1.0 : pow(dop, 1.5) * sqrt(1.0 - uBeta * uBeta);
+}
+// approximate colour/brightness change for unresolved stellar populations
+vec3 dopplerTint(float dop){
+  float k = clamp(log2(dop), -3.0, 3.0);
+  return vec3(pow(2.0, -0.7 * k), 1.0, pow(2.0, 0.7 * k)) * relExposure(dop);
+}
+`;
+
 export const LOGDEPTH_VERT_PARS = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>

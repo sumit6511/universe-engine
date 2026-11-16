@@ -11,7 +11,7 @@ import type { Engine, FrameContext, System } from '../engine/engine';
 import { Entity, type InfoData, type InfoRow } from '../engine/entity';
 import type { AddLabel } from '../engine/labels';
 import { lookbackTime } from '../physics/cosmology';
-import { NOISE } from '../shaders/common';
+import { NOISE, REL, RELATIVITY } from '../shaders/common';
 import { sig } from '../ui/format';
 
 /** [name, messier, common name, hubble type, distance method (0 redshift, 1 cluster, 2 measured), z] */
@@ -60,21 +60,23 @@ export class GalaxyField implements System {
     geo.instanceCount = n;
     this.material = new ShaderMaterial({
       transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending,
-      uniforms: { uPixelScale: { value: 1000 }, uPixelRatio: { value: 1 }, uGain: { value: 1 } },
+      uniforms: { uPixelScale: { value: 1000 }, uPixelRatio: { value: 1 }, uGain: { value: 1 }, uBeta: REL.uBeta },
       vertexShader: /* glsl */ `
+        ${RELATIVITY}
         attribute vec3 iPos; attribute vec3 iNormal; attribute vec4 iParams; attribute vec4 iMajor;
         uniform float uPixelScale, uPixelRatio, uGain;
         varying vec2 vUv; varying vec3 vN; varying vec3 vMaj; varying vec4 vParams; varying float vFlux; varying float vPx;
         void main(){
           vec4 c = modelViewMatrix * vec4(iPos, 1.0);
           float d = max(length(c.xyz), 1e-9);
+          float dop; c.xyz = aberrate(c.xyz, dop);
           float R = iParams.x * 1.0e-3 * 1.7;                 // billboard half-size, Mpc
           float px = R / d * uPixelScale;
           float s = max(px, 2.1 * uPixelRatio);
           vPx = px;
           // unresolved galaxies fade more slowly than 1/d^2 so the large-scale structure stays readable
           float lum = clamp(pow(10.0, -0.4 * (iParams.y + 20.5)), 0.03, 6.0);
-          vFlux = pow(px / s, 1.0) * uGain * pow(lum, 0.45);
+          vFlux = pow(px / s, 1.0) * uGain * pow(lum, 0.45) * relExposure(dop);
           vec3 f = c.xyz / d;
           vec3 r = normalize(cross(f, vec3(0.0, 1.0, 0.0)));
           vec3 u = cross(r, f);
@@ -269,7 +271,7 @@ export class GalaxyField implements System {
       // apparent magnitude from the camera decides which names appear
       const m = d[o + 7] + 5 * Math.log10(Math.max(dist, 1e-6) * 1e5);
       if (m > 10.2 && px < 6) continue;
-      if (!ctx.project(_v, p)) continue;
+      if (!ctx.project(_v, p, true)) continue;
       add({ x: p.x, y: p.y, text: this.labelName(i), priority: 28 - m + (px > 8 ? 20 : 0), color: '#c9d6f2', resolve: () => this.galaxyEntity(i), offset: Math.min(50, Math.max(6, px * 0.7 + 4)), kind: 'galaxy', key: `g${i}` });
     }
     if (scaleMpc > 4 && scaleMpc < 1500) {
@@ -289,7 +291,7 @@ export class GalaxyField implements System {
       const o = i * st;
       _v.set(d[o] - this.camMpc.x, d[o + 1] - this.camMpc.y, d[o + 2] - this.camMpc.z);
       const dist = _v.length();
-      if (!ctx.project(_v, p)) continue;
+      if (!ctx.project(_v, p, true)) continue;
       const px = ((d[o + 6] * 1e-3) / Math.max(dist, 1e-9)) * ctx.pixelScale / ctx.pixelRatio;
       const r = Math.hypot(p.x - x, p.y - y);
       if (r > Math.max(radiusPx, px * 0.8)) continue;

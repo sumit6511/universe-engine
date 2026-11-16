@@ -17,6 +17,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { REL } from '../shaders/common';
 import { MPC_KM, PC_KM } from '../core/constants';
 import { CameraRig } from './camera';
 import type { Entity } from './entity';
@@ -52,7 +54,8 @@ export interface FrameContext {
   /** camera-relative position (km) of an entity */
   rel(e: Entity, out: Vector3): Vector3;
   /** project a camera-relative vector to CSS pixels; returns false when behind the camera */
-  project(rel: Vector3, out: { x: number; y: number }): boolean;
+  /** `sky`: the vector points at a star/galaxy-layer source (any units), so relativistic aberration applies */
+  project(rel: Vector3, out: { x: number; y: number }, sky?: boolean): boolean;
 }
 
 export interface System {
@@ -104,6 +107,9 @@ export class Engine {
   height = 1;
   pixelRatio = 1;
   exposure = 1;
+  /** observer speed / c for the relativistic flight view */
+  beta = 0;
+  lens!: ShaderPass;
   private size = new Vector2();
   private _cam = new Vector3();
 
@@ -134,15 +140,52 @@ export class Engine {
     this.bloom = new UnrealBloomPass(new Vector2(256, 256), quality.bloom ? 0.55 : 0, 0.55, 0.9);
     this.bloom.enabled = quality.bloom;
     this.composer.addPass(this.bloom);
+    // Cinematic lens: anamorphic streaks, chromatic aberration, vignette, grain (all in linear HDR)
+    this.lens = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uAspect: { value: 1 }, uAmount: { value: 1 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse; uniform float uTime, uAspect, uAmount; varying vec2 vUv;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+        void main(){
+          vec2 c = vUv - 0.5;
+          float r2 = dot(c * vec2(uAspect, 1.0), c * vec2(uAspect, 1.0));
+          // lateral chromatic aberration grows toward the frame edge
+          vec2 off = c * r2 * 0.012 * uAmount;
+          vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
+          // anamorphic streak: horizontal smear of the brightest pixels
+          vec3 streak = vec3(0.0);
+          for (int i = -10; i <= 10; i++) {
+            if (i == 0) continue;
+            float fi = float(i);
+            vec3 s = texture2D(tDiffuse, vUv + vec2(fi * 0.011, 0.0)).rgb;
+            streak += max(s - 1.15, 0.0) * exp(-abs(fi) * 0.28);
+          }
+          col += streak * vec3(0.45, 0.62, 1.0) * 0.10 * uAmount;
+          col *= mix(1.0, smoothstep(1.05, 0.25, r2), 0.55 * uAmount);
+          float g = hash(gl_FragCoord.xy + fract(uTime) * 91.7) - 0.5;
+          col += g * 0.018 * uAmount * (0.35 + sqrt(max(dot(col, vec3(0.333)), 0.0)));
+          gl_FragColor = vec4(max(col, 0.0), 1.0);
+        }`,
+    });
+    this.composer.addPass(this.lens);
     this.composer.addPass(new OutputPass());
 
     const self = this;
     this.ctx = {
       jd: 0, time: 0, dt: 0, rig: this.rig, distKm: 1, sunDistPc: 0, pixelScale: 1, width: 1, height: 1, pixelRatio: 1,
       rel(e, out) { return e.relativeTo(self.rig.anchor, self.rig.local, out); },
-      project(rel, out) {
+      project(rel, out, sky) {
         const cam = self.near.camera;
         self._cam.copy(rel).applyQuaternion(cam.quaternion.clone().invert());
+        // relativistic view: distant sources appear where aberration puts them (solid bodies are not warped)
+        if (self.beta > 1e-5 && (sky ?? rel.lengthSq() > 1e22)) {
+          const v = self._cam, d = v.length(), b = self.beta;
+          const c = -v.z / d, cp = (c + b) / (1 + b * c);
+          const pl = Math.hypot(v.x, v.y) / d, sp = Math.sqrt(Math.max(0, 1 - cp * cp));
+          const k = pl > 1e-9 ? sp / pl : 0;
+          v.set(v.x * k, v.y * k, -cp * d);
+        }
         if (self._cam.z >= 0) return false;
         const f = 1 / Math.tan((cam.fov * Math.PI) / 360);
         const nx = (self._cam.x * f) / (-self._cam.z * cam.aspect);
@@ -202,6 +245,9 @@ export class Engine {
     }
     for (const s of this.systems) s.update(ctx);
     this.renderer.toneMappingExposure = this.exposure;
+    REL.uBeta.value = this.beta;
+    this.lens.uniforms.uTime.value = time;
+    this.lens.uniforms.uAspect.value = this.width / this.height;
     this.composer.render(dt);
   }
 }

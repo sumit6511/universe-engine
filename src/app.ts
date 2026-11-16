@@ -12,6 +12,7 @@ import { GalaxyField } from './scene/galaxies';
 import { MilkyWay } from './scene/milkyway';
 import { SolarSystem } from './scene/solar';
 import { StarField } from './scene/stars';
+import { Guides, Spacecraft } from './scene/extras';
 import type { ZeldovichResult } from './workers/zeldovich.worker';
 
 export interface SearchEntry { text: string; label: string; sub: string; weight: number; get: () => Entity | null }
@@ -71,6 +72,10 @@ export class App {
   milkyway!: MilkyWay;
   galaxies!: GalaxyField;
   web!: CosmicWeb;
+  craft!: Spacecraft;
+  guides!: Guides;
+  /** entities that are not recreated on demand, by id (for shareable links) */
+  private fixed = new Map<string, Entity>();
   search: SearchEntry[] = [];
   selected: Entity | null = null;
   onSelect: ((e: Entity | null) => void) | null = null;
@@ -120,8 +125,10 @@ export class App {
     this.milkyway = new MilkyWay(e);
     this.galaxies = new GalaxyField(e, new Float32Array(galBin), galMeta);
     this.web = new CosmicWeb(e);
-    e.systems.push(this.solar, this.stars, this.milkyway, this.galaxies, this.web);
-    this.labelSystems.push(this.solar as LabelSystem, this.stars as LabelSystem, this.milkyway as LabelSystem, this.galaxies as LabelSystem, this.web as LabelSystem);
+    this.craft = new Spacecraft(e, this.solar);
+    this.guides = new Guides(e, this.solar, this.stars);
+    e.systems.push(this.solar, this.craft, this.stars, this.guides, this.milkyway, this.galaxies, this.web);
+    this.labelSystems.push(this.solar as LabelSystem, this.stars as LabelSystem, this.milkyway as LabelSystem, this.galaxies as LabelSystem, this.web as LabelSystem, this.craft as LabelSystem, this.guides as LabelSystem);
     progress(0.95, 'Indexing');
     this.buildSearch();
     this.solar.simulate(this.clock.jd);
@@ -161,6 +168,45 @@ export class App {
     this.onSelect?.(e);
   }
 
+  /** Resolve an entity id (as used in shareable links). */
+  entityById(id: string): Entity | null {
+    const body = this.solar.byId.get(id);
+    if (body) return body.entity;
+    if (id === 'milkyway') return this.milkyway.entity;
+    if (id === 'universe') return this.web.entity;
+    const fx = this.fixed.get(id);
+    if (fx) return fx;
+    const parts = id.split(':');
+    const n = parseInt(parts[1], 10);
+    if (parts[0] === 'star' && n >= 0 && n < this.stars.count) return this.stars.starEntity(n);
+    if (parts[0] === 'galaxy' && n >= 0 && n < this.galaxies.count) return this.galaxies.galaxyEntity(n);
+    if (parts[0] === 'exo' && n > 0 && n < this.stars.count) { try { return this.stars.exoPlanetEntity(n, parseInt(parts[2], 10)); } catch { return null; } }
+    return null;
+  }
+  registerEntity(e: Entity): void { this.fixed.set(e.id, e); }
+
+  /** Compact description of the current view: target, distance, angles and date. */
+  viewState(): string {
+    const r = this.engine.rig;
+    return ['at', r.target.id, r.lnDistTarget.toFixed(3), r.yaw.toFixed(3), r.pitch.toFixed(3), this.clock.jd.toFixed(4)].join('/');
+  }
+  /** Restore a view written by viewState(). Returns false if it does not parse. */
+  applyViewState(s: string): boolean {
+    const p = s.split('/');
+    if (p[0] !== 'at' || p.length < 6) return false;
+    const e = this.entityById(p[1]);
+    const [ln, yaw, pitch, jd] = p.slice(2, 6).map(parseFloat);
+    if (!e || ![ln, yaw, pitch, jd].every(isFinite)) return false;
+    this.clock.jd = jd;
+    for (const s2 of this.engine.systems) s2.simulate?.(jd);
+    const idx = this.stars.systemIndexOf(e);
+    if (idx > 0) { this.stars.activate(idx); this.stars.simulate(jd); }
+    this.engine.rig.setFocus(e, Math.exp(ln));
+    this.engine.rig.yaw = yaw; this.engine.rig.pitch = Math.max(-1.55, Math.min(1.55, pitch));
+    this.select(e);
+    return true;
+  }
+
   find(name: string): Entity | null {
     return this.byName.get(name.toLowerCase())?.() ?? null;
   }
@@ -182,7 +228,8 @@ export class App {
     for (const b of this.solar.bodies) add(b.def.name, b.entity.subtitle, 100 + b.entity.rank, () => b.entity, b.def.id);
     add('Milky Way', 'Our galaxy', 190, () => this.milkyway.entity, 'galaxy galactic centre');
     add('Observable Universe', 'Cosmology', 150, () => this.web.entity, 'cmb cosmic microwave background big bang');
-    for (const e of this.galaxies.regions()) add(e.name, e.subtitle, 120, () => e);
+    for (const e of this.galaxies.regions()) { add(e.name, e.subtitle, 120, () => e); this.fixed.set(e.id, e); }
+    for (const c of this.craft.craft) { add(c.def.name, 'Spacecraft', 140, () => c.entity, 'probe spacecraft nasa'); this.fixed.set(c.entity.id, c.entity); }
     const seen = new Set<number>();
     for (const s of this.stars.namedStars()) {
       seen.add(s.i);
@@ -257,6 +304,7 @@ export class App {
     };
     if (ctx.sunDistPc < 0.06) for (const b of this.solar.bodies) consider(b.entity, b.rel, b.def.radius, true);
     for (const b of this.stars.activeBodies()) consider(b.entity, b.rel, b.radiusKm, true);
+    if (ctx.sunDistPc < 0.06) for (const b of this.craft.bodies()) consider(b.entity, b.rel, b.radiusKm, true);
     if (best) return best;
     const scaleKpc = ctx.distKm / KPC_KM;
     const star = scaleKpc < 40 ? this.stars.pick(ctx, x, y) : null;

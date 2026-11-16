@@ -13,7 +13,7 @@ import { Entity, type InfoData, type InfoRow } from '../engine/entity';
 import type { AddLabel } from '../engine/labels';
 import { elementsToPosition, solveKepler } from '../physics/kepler';
 import { blackbodyRGB, bvToTeff, habitableZone, starProps } from '../physics/stellar';
-import { BLACKBODY } from '../shaders/common';
+import { BLACKBODY, REL, RELATIVITY } from '../shaders/common';
 import { BODY_FRAG, BODY_VERT, GLOW_FRAG, GLOW_VERT, STAR_FRAG, STAR_VERT } from '../shaders/planet';
 import { fmtDist, fmtDuration, hexColor, sig } from '../ui/format';
 import { PlaneGeometry } from 'three';
@@ -105,21 +105,24 @@ export class StarField implements System {
     geo.setAttribute('aMag', new BufferAttribute(mag, 2));
     this.material = new ShaderMaterial({
       transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending,
-      uniforms: { uMyr: { value: 0 }, uPixelRatio: { value: 1 }, uMagLimit: { value: this.magLimit }, uHide: { value: -1 }, uGain: { value: 1 } },
+      uniforms: { uMyr: { value: 0 }, uPixelRatio: { value: 1 }, uMagLimit: { value: this.magLimit }, uHide: { value: -1 }, uGain: { value: 1 }, uBeta: REL.uBeta },
       vertexShader: /* glsl */ `
         ${BLACKBODY}
+        ${RELATIVITY}
         attribute vec3 aVel; attribute vec2 aMag;
         uniform float uMyr, uPixelRatio, uMagLimit, uHide, uGain;
         varying vec3 vColor;
         void main(){
           vec4 mv = modelViewMatrix * vec4(position + aVel * uMyr, 1.0);
           float d = max(length(mv.xyz), 1e-12);
+          float dop; mv.xyz = aberrate(mv.xyz, dop);
           float m = aMag.x + 5.0 * log(d * 0.1) / 2.302585093;       // apparent magnitude from the camera
           float b = pow(10.0, min(0.4 * (uMagLimit - m), 30.0));     // flux relative to the faintest visible star
+          b *= relExposure(dop);                                      // relativistic beaming
           if (float(gl_VertexID) == uHide) b = 0.0;
           float size = (1.3 + 1.15 * pow(b, 0.27)) * uPixelRatio;
           float inten = b < 1.0 ? b * b * 0.7 : 0.7 + 0.5 * log(b) / 2.302585093;
-          vec3 c = blackbody(bvToTeff(aMag.y));
+          vec3 c = blackbody(bvToTeff(aMag.y) * dop);
           float l = dot(c, vec3(0.3, 0.55, 0.15));
           c = max(mix(vec3(l), c, 1.35), 0.0);                        // modest saturation boost so colours read on screen
           vColor = c * min(inten, 2.2) * uGain;
@@ -155,8 +158,8 @@ export class StarField implements System {
       lg.setAttribute('aVel', new BufferAttribute(lv, 3));
       const lm = new ShaderMaterial({
         transparent: true, depthTest: false, depthWrite: false, blending: AdditiveBlending,
-        uniforms: { uMyr: { value: 0 }, uAlpha: { value: 0.5 } },
-        vertexShader: `attribute vec3 aVel; uniform float uMyr; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + aVel * uMyr, 1.0); gl_Position.z = 0.0; }`,
+        uniforms: { uMyr: { value: 0 }, uAlpha: { value: 0.5 }, uBeta: REL.uBeta },
+        vertexShader: `${RELATIVITY} attribute vec3 aVel; uniform float uMyr; void main(){ vec4 mv = modelViewMatrix * vec4(position + aVel * uMyr, 1.0); float dop; mv.xyz = aberrate(mv.xyz, dop); gl_Position = projectionMatrix * mv; gl_Position.z = 0.0; }`,
         fragmentShader: `uniform float uAlpha; void main(){ gl_FragColor = vec4(vec3(0.33, 0.50, 0.85) * uAlpha, 1.0); }`,
       });
       this.constellations = new LineSegments(lg, lm);
@@ -357,6 +360,16 @@ export class StarField implements System {
 
   get activeIndex(): number { return this.active ? this.active.index : -1; }
 
+  /** Conservative habitable zone (AU) and orbital plane of the close-up system. */
+  activeHabitableZone(): { index: number; rel: Vector3; basis: Matrix4; hz: [number, number] } | null {
+    const a = this.active;
+    if (!a) return null;
+    const host = this.exoByStar.get(a.index);
+    const props = starProps(this.absMag(a.index), this.colorIndex(a.index));
+    const lum = host?.r && host?.t ? host.r * host.r * (host.t / 5772) ** 4 : props.luminosity;
+    return { index: a.index, rel: a.rel, basis: a.basis, hz: habitableZone(lum, a.teff) };
+  }
+
   /** Star and planets of the close-up system, for picking. */
   activeBodies(): { entity: Entity; rel: Vector3; radiusKm: number }[] {
     const a = this.active;
@@ -453,7 +466,7 @@ export class StarField implements System {
         const d = _v.length();
         const m = this.absMag(s.i) + 5 * Math.log10(Math.max(d, 1e-9) / 10);
         if (m > this.magLimit - 3.2) continue;
-        if (!ctx.project(_v, p)) continue;
+        if (!ctx.project(_v, p, true)) continue;
         const i = s.i;
         add({ x: p.x, y: p.y, text: s.name, priority: 20 - m, color: '#cfd8ee', resolve: () => this.starEntity(i), offset: 7, kind: 'star', key: `s${i}` });
       }
@@ -461,7 +474,7 @@ export class StarField implements System {
     if (this.showConstellations && ctx.sunDistPc < 3) {
       for (const [name, x, y, z] of this.constData.labels) {
         _v.set(x, y, z);
-        if (!ctx.project(_v, p)) continue;
+        if (!ctx.project(_v, p, true)) continue;
         add({ x: p.x, y: p.y, text: name.toUpperCase(), priority: 2, color: '#6f86bd', kind: 'constellation', offset: 0, alpha: 0.75 });
       }
     }
@@ -488,13 +501,21 @@ export class StarField implements System {
     const e = _m.elements;
     const f = 1 / Math.tan((cam.fov * Math.PI) / 360);
     let best = -1, bestScore = -Infinity;
+    const beta = this.engine.beta;
     const cx = this.camPc.x, cy = this.camPc.y, cz = this.camPc.z, myr = this.myr;
     for (let i = 0; i < this.count; i++) {
       const o = i * STRIDE;
       const rx = d[o] + d[o + 3] * myr - cx, ry = d[o + 1] + d[o + 4] * myr - cy, rz = d[o + 2] + d[o + 5] * myr - cz;
-      const vz = e[2] * rx + e[6] * ry + e[10] * rz;
+      let vz = e[2] * rx + e[6] * ry + e[10] * rz;
+      let vx = e[0] * rx + e[4] * ry + e[8] * rz, vy = e[1] * rx + e[5] * ry + e[9] * rz;
+      if (beta > 1e-5) {
+        // same aberration as the vertex shader
+        const dd = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+        const c = -vz / dd, cp = (c + beta) / (1 + beta * c);
+        const pl = Math.hypot(vx, vy) / dd, k = pl > 1e-9 ? Math.sqrt(Math.max(0, 1 - cp * cp)) / pl : 0;
+        vx *= k; vy *= k; vz = -cp * dd;
+      }
       if (vz >= 0) continue;
-      const vx = e[0] * rx + e[4] * ry + e[8] * rz, vy = e[1] * rx + e[5] * ry + e[9] * rz;
       const sx = ((vx * f) / (-vz * cam.aspect) * 0.5 + 0.5) * ctx.width;
       const sy = ((-vy * f) / -vz * 0.5 + 0.5) * ctx.height;
       const dx = sx - x, dy = sy - y;

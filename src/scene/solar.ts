@@ -54,7 +54,7 @@ export class Body {
   }
 }
 
-function makeGlow(color: number, minPx: number, power: number, inner: number, sizeKm = 0): Mesh {
+export function makeGlow(color: number, minPx: number, power: number, inner: number, sizeKm = 0): Mesh {
   const mat = new ShaderMaterial({
     vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending,
     uniforms: {

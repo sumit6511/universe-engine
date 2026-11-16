@@ -1,3 +1,4 @@
+import { Vector3 } from 'three';
 // DOM user interface: labels, search, scale ruler, readouts, info panel, time controls, tour.
 
 import type { App } from '../app';
@@ -73,6 +74,18 @@ export class UI {
       canvas.classList.add('dragging');
       this.closePopovers();
     });
+    // hover: find what is under the cursor a few times a second
+    let hoverAt = 0;
+    canvas.addEventListener('pointermove', (ev) => {
+      if (pts.size || ev.pointerType === 'touch' || this.controller) return;
+      const now = performance.now();
+      if (now - hoverAt < 110) return;
+      hoverAt = now;
+      const r = canvas.getBoundingClientRect();
+      this.hoverEntity = this.app.pick(ev.clientX - r.left, ev.clientY - r.top);
+      canvas.style.cursor = this.hoverEntity ? 'pointer' : '';
+    });
+    canvas.addEventListener('pointerleave', () => { this.hoverEntity = null; });
     canvas.addEventListener('pointermove', (ev) => {
       const p = pts.get(ev.pointerId);
       if (!p) return;
@@ -222,6 +235,20 @@ export class UI {
     chk('set-const', (v) => (app.stars.showConstellations = v));
     chk('set-belt', (v) => (app.solar.showBelt = v));
     chk('set-web', (v) => (app.web.enabled = v));
+    chk('set-craft', (v) => (app.craft.show = v));
+    chk('set-guides', (v) => (app.guides.show = v));
+    chk('set-lens', (v) => { app.engine.lens.enabled = v; });
+    // speed slider: beta = 1 - 10^(-4 x), so the top of the range reaches 0.9999 c
+    rng('set-beta', (v) => {
+      const beta = v <= 0 ? 0 : 1 - Math.pow(10, (-4 * v) / 1000);
+      app.engine.beta = beta;
+      const gamma = 1 / Math.sqrt(1 - beta * beta);
+      $('set-beta-read').textContent = beta === 0 ? 'at rest \u00b7 drag to fly at near light speed' : `${beta.toFixed(beta > 0.99 ? 4 : 3)} c \u00b7 \u03b3 = ${sig(gamma, 3)}`;
+      $('warp').hidden = beta === 0;
+      $('warp-speed').textContent = `${(beta * 100).toFixed(beta > 0.99 ? 2 : 1)}% of light speed`;
+      $('warp-detail').textContent = `time dilation \u00d7${sig(gamma, 3)} \u00b7 sky ahead blueshifted \u00d7${sig(gamma * (1 + beta), 3)}`;
+    });
+    $('btn-share').onclick = () => this.share();
     rng('set-mag', (v) => (app.stars.magLimit = v));
     rng('set-exposure', (v) => (app.engine.exposure = v));
     rng('set-bloom', (v) => { app.engine.bloom.strength = v; app.engine.bloom.enabled = v > 0.01; });
@@ -243,6 +270,19 @@ export class UI {
     if (stored) { u.searchParams.delete('q'); if (u.toString() === location.href) { location.reload(); return; } }
     else u.searchParams.set('q', name);
     location.replace(u.toString());
+  }
+  private async share(): Promise<void> {
+    const u = new URL(location.href);
+    u.hash = this.app.viewState();
+    const b = $('btn-share');
+    try {
+      await navigator.clipboard.writeText(u.toString());
+      b.textContent = 'Link copied';
+    } catch {
+      // clipboard unavailable: put the link in the address bar instead
+      try { history.replaceState(null, '', u.toString()); b.textContent = 'Link is in the address bar'; } catch { b.textContent = 'Copy not available here'; }
+    }
+    setTimeout(() => { b.textContent = 'Copy link to this view'; }, 2200);
   }
   onLab: (() => void) | null = null;
   /** when set (gravity lab), pointer gestures drive this instead of the universe camera */
@@ -439,6 +479,7 @@ export class UI {
         $('set-stats').textContent = `${this.fps.toFixed(0)} fps · ${app.quality.name}${w.n ? ` · web ${w.n}³, σ=${w.sigma.toFixed(2)}` : ''}`;
       }
     }
+    this.updateHud(ctx);
     this.updateLabels(ctx);
   }
 
@@ -456,6 +497,36 @@ export class UI {
     $('perf-lower').onclick = () => {
       this.reloadWithQuality(lower.name);
     };
+  }
+
+  private hoverEntity: Entity | null = null;
+  private lockedOn: Entity | null = null;
+  private hudV = new Vector3();
+  /** Targeting brackets on the current target and on whatever is under the cursor. */
+  private updateHud(ctx: FrameContext): void {
+    const place = (el: HTMLElement, e: Entity | null, minHalf: number): boolean => {
+      if (!e) { el.hidden = true; return false; }
+      const rel = ctx.rel(e, this.hudV);
+      const p = { x: 0, y: 0 };
+      if (!ctx.project(rel, p)) { el.hidden = true; return false; }
+      const disc = ((e.radiusKm / Math.max(rel.length(), 1)) * ctx.pixelScale) / ctx.pixelRatio;
+      if (disc > Math.min(ctx.width, ctx.height) * 0.3) { el.hidden = true; return false; }
+      const half = Math.max(minHalf, disc + 7);
+      el.hidden = false;
+      el.style.width = el.style.height = `${half * 2}px`;
+      el.style.transform = `translate3d(${Math.round(p.x - half)}px, ${Math.round(p.y - half)}px, 0)`;
+      return true;
+    };
+    const target = ctx.rig.target;
+    const ret = $('reticle');
+    place(ret, target.kind === 'region' ? null : target, 15);
+    if (target !== this.lockedOn) { this.lockedOn = target; ret.classList.remove('lock'); void ret.offsetWidth; ret.classList.add('lock'); }
+    const h = this.hoverEntity && this.hoverEntity !== target ? this.hoverEntity : null;
+    if (place($('hover'), h, 11) && h) {
+      const txt = `${h.name} \u00b7 ${fmtDist(ctx.rel(h, this.hudV).length())}`;
+      const t = $('hover-text');
+      if (t.textContent !== txt) t.textContent = txt;
+    }
   }
 
   private updateLabels(ctx: FrameContext): void {
