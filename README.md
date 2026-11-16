@@ -31,6 +31,10 @@ Requires WebGL 2. Detail level: `?q=low|medium|high|ultra` or the View menu.
 | Spacecraft | Voyager 1 and 2, Pioneer 10 and 11, New Horizons at their real positions | JPL Horizons state vectors |
 | Relativistic flight | Aberration, Doppler shift and beaming of the whole sky at up to 0.9999 c | Special relativity |
 | Guides | Habitable zones (Sun and every exoplanet host), reach of human radio signals | Kopparapu et al. 2013 |
+| Free flight | Fly the camera with WASD at a speed that scales with distance | — |
+| Planetarium | The sky from a chosen place on the rotating Earth, with daylight and twilight | Same ephemerides as the rest |
+| Deep sky | 37 nebulae, star clusters and pulsars at measured distances | Curated literature values |
+| Living planets | Gas-giant winds, Earth cloud shadows and aurorae | Illustrative animation |
 | Gravity lab | GPU N-body: galaxy encounters (restricted three-body) and a self-gravitating cluster (direct summation) | Toomre & Toomre 1972 |
 
 The app opens in its classic mode. The **Advanced** button in the top bar turns on the
@@ -103,6 +107,11 @@ temperature profile; intensity scales as g⁴T⁴ with g the product of Doppler 
 gravitational shifts. The background is a cube map of the actual surrounding scene.
 
 ## Known limitations
+
+* Deep-sky images are procedural impressions of each object type, and their positions come from
+  a hand-curated table rather than a catalogue. Gas-giant wind speeds are exaggerated to be visible.
+* In the planetarium, labels of bodies below the horizon still show; refraction and terrain are
+  not modelled. Ambient sound has only been checked to start, not listened to.
 
 * The relativistic view moves along the line of sight and applies to stars, the Milky Way and
   galaxies; solid bodies are not warped. Colour temperature shifts exactly by the Doppler factor,

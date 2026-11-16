@@ -1,3 +1,5 @@
+import { PLACES } from '../scene/planetarium';
+import { Ambience } from './sound';
 import { LIVE } from '../scene/solar';
 import { Vector3 } from 'three';
 // DOM user interface: labels, search, scale ruler, readouts, info panel, time controls, tour.
@@ -243,6 +245,7 @@ export class UI {
     chk('set-guides', (v) => (app.guides.show = v));
     chk('set-dso', (v) => (app.deepsky.show = v));
     chk('set-lens', (v) => { app.engine.lens.enabled = v; });
+    chk('set-sound', (v) => { if (v) this.sound.start().then((ok) => { if (!ok) $<HTMLInputElement>('set-sound').checked = false; }); else this.sound.stop(); });
     // speed slider: beta = 1 - 10^(-4 x), so the top of the range reaches 0.9999 c
     rng('set-beta', (v) => {
       const beta = v <= 0 ? 0 : 1 - Math.pow(10, (-4 * v) / 1000);
@@ -256,6 +259,12 @@ export class UI {
     $('btn-share').onclick = () => this.share();
     $('btn-fly').onclick = () => this.setFlying(!app.engine.rig.flying);
     $('fly-exit').onclick = () => this.setFlying(false);
+    const sel = $<HTMLSelectElement>('sky-place');
+    PLACES.forEach((pl, i) => { const o = document.createElement('option'); o.value = String(i); o.textContent = pl.name; sel.appendChild(o); });
+    sel.onchange = () => app.sky.enter(PLACES[parseInt(sel.value, 10)]);
+    $('btn-sky').onclick = () => this.setSky(!app.sky.active);
+    $('sky-exit').onclick = () => this.setSky(false);
+    app.onLeaveSky = () => this.setSky(false, true);
     const hold = (id: string, z: number) => {
       const el = $(id);
       const set = (v: number) => (ev: Event) => { ev.preventDefault(); this.padThrust = v; };
@@ -290,12 +299,24 @@ export class UI {
     else u.searchParams.set('q', name);
     location.replace(u.toString());
   }
+  private sound = new Ambience();
+  /** Planetarium: stand on Earth and look at the sky. */
+  setSky(on: boolean, alreadyLeft = false): void {
+    const app = this.app;
+    if (on && (!app.advanced || this.controller)) return;
+    if (on) { this.stopTour(); this.setFlying(false); app.sky.enter(PLACES[parseInt($<HTMLSelectElement>('sky-place').value, 10) || 0]); app.select(null); this.closePopovers(); }
+    else if (!alreadyLeft) app.sky.exit();
+    document.body.classList.toggle('sky-mode', on);
+    $('skybar').hidden = !on;
+    $('btn-sky').setAttribute('aria-pressed', String(on));
+  }
   private keys = new Set<string>();
   private padThrust = 0;
   /** Free flight: WASD moves the camera itself instead of orbiting a target. */
   setFlying(on: boolean): void {
     const rig = this.app.engine.rig;
     if (on && (!this.app.advanced || this.controller)) return;
+    if (on && this.app.sky.active) this.setSky(false);
     if (on) this.stopTour();
     rig.setFlying(on);
     this.keys.clear(); this.padThrust = 0;
@@ -334,6 +355,8 @@ export class UI {
     b.setAttribute('aria-pressed', String(on));
     b.textContent = on ? 'Advanced \u00b7 on' : 'Advanced';
     if (!on) this.setFlying(false);
+    if (!on && this.app.sky?.active) this.setSky(false);
+    if (!on) { this.sound.stop(); $<HTMLInputElement>('set-sound').checked = false; }
     if (!on) { this.hoverEntity = null; this.app.engine.canvas.style.cursor = ''; }
     // leaving advanced mode while parked on a probe: go home
     if (!on && app.engine.rig.target.kind === 'spacecraft') { const sun = app.find('Sun'); if (sun) app.goTo(sun, 85 * AU_KM); }
@@ -459,6 +482,7 @@ export class UI {
     if (i < 0) i = 0;
     if (i >= TOUR.length) { this.stopTour(); return; }
     this.setFlying(false);
+    if (this.app.sky.active) this.setSky(false);
     this.tourIndex = i;
     const step: TourStep = TOUR[i];
     const token = ++this.tourToken;
@@ -550,6 +574,8 @@ export class UI {
       }
     }
     this.updateFlight();
+    if (this.app.sky.active) { const t = this.app.sky.describe(); const el = $('sky-read'); if (el.textContent !== t) el.textContent = t; }
+    if (this.sound.on) { const rg = this.app.engine.rig; this.sound.update(Math.log10(Math.max(ctx.distKm, 1)), Math.max(this.app.engine.beta, rg.flying ? Math.min(1, rg.thrust.length()) : 0, rg.flight ? 0.6 : 0)); }
     this.updateHud(ctx);
     this.updateLabels(ctx);
   }

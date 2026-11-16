@@ -22,7 +22,9 @@ export class DeepSky implements System {
   private mesh: Mesh;
   private material: ShaderMaterial;
 
+  private engineRef: Engine;
   constructor(engine: Engine) {
+    this.engineRef = engine;
     const n = DEEP_SKY.length;
     const iPos = new Float32Array(n * 3), iParams = new Float32Array(n * 4);
     DEEP_SKY.forEach((def, i) => {
@@ -142,18 +144,18 @@ export class DeepSky implements System {
   }
 
   update(ctx: FrameContext): void {
-    this.mesh.visible = this.show;
+    this.mesh.visible = this.show && this.engineRef.skyDim > 0.05;
     if (!this.show) return;
     const u = this.material.uniforms;
     u.uPixelScale.value = ctx.pixelScale; u.uPixelRatio.value = ctx.pixelRatio; u.uTime.value = ctx.time;
     // faint from inside the disc, clearer once they are the subject of the view
     const scalePc = ctx.distKm / PC_KM;
-    u.uGain.value = 0.55 + 0.6 * Math.min(1, Math.max(0, Math.log10(Math.max(scalePc, 1e-3) / 0.05) / 2));
+    u.uGain.value = this.engineRef.skyDim * (0.55 + 0.6 * Math.min(1, Math.max(0, Math.log10(Math.max(scalePc, 1e-3) / 0.05) / 2)));
     for (const o of this.objects) ctx.rel(o.entity, o.rel);
   }
 
   labels(ctx: FrameContext, add: AddLabel): void {
-    if (!this.show || ctx.sunDistPc > 60000) return;
+    if (!this.show || ctx.sunDistPc > 60000 || this.engineRef.skyDim < 0.35) return;
     const p = { x: 0, y: 0 };
     for (const o of this.objects) {
       const d = o.rel.length();

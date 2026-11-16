@@ -393,6 +393,7 @@ export class StarField implements System {
     u.uMyr.value = this.myr;
     u.uPixelRatio.value = ctx.pixelRatio;
     u.uMagLimit.value = this.magLimit;
+    u.uGain.value = this.engine.skyDim;
     u.uHide.value = this.active ? this.active.index : -1;
     this.camPc.copy(ctx.rig.anchor).addScaledVector(ctx.rig.local, 1 / PC_KM);
     if (this.constellations) {
@@ -400,7 +401,7 @@ export class StarField implements System {
       const fade = Math.min(1, Math.max(0, 1 - Math.log10(Math.max(ctx.sunDistPc, 1) / 6) / 1.3));
       this.constellations.visible = this.showConstellations && fade > 0.01;
       cu.uMyr.value = this.myr;
-      cu.uAlpha.value = 0.36 * fade;
+      cu.uAlpha.value = 0.36 * fade * this.engine.skyDim;
     }
     const a = this.active;
     if (!a) return;
@@ -459,7 +460,7 @@ export class StarField implements System {
 
   labels(ctx: FrameContext, add: AddLabel): void {
     const p = { x: 0, y: 0 };
-    if (ctx.sunDistPc < 4000) {
+    if (ctx.sunDistPc < 4000 && this.engine.skyDim > 0.35) {
       // brightest named stars as seen from the camera
       for (const s of this.named) {
         this.starPos(s.i, _v).sub(this.camPc);
@@ -471,7 +472,7 @@ export class StarField implements System {
         add({ x: p.x, y: p.y, text: s.name, priority: 20 - m, color: '#cfd8ee', resolve: () => this.starEntity(i), offset: 7, kind: 'star', key: `s${i}` });
       }
     }
-    if (this.showConstellations && ctx.sunDistPc < 3) {
+    if (this.showConstellations && ctx.sunDistPc < 3 && this.engine.skyDim > 0.35) {
       for (const [name, x, y, z] of this.constData.labels) {
         _v.set(x, y, z);
         if (!ctx.project(_v, p, true)) continue;

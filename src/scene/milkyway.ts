@@ -306,7 +306,7 @@ export class MilkyWay implements System {
     const outside = Math.min(1, Math.max(0, Math.log10(Math.max(scalePc, 1) / 150) / 1.5));
     // far away the galaxy shrinks to a few pixels: lift it so the Local Group stays readable
     const far = 1 + 3.5 * Math.min(1, Math.max(0, Math.log10(Math.max(scalePc, 1) / 1.5e5) / 1.2));
-    u.uGain.value = (0.0045 + 0.075 * outside * outside) * (0.6 + 0.4 * Math.min(1, dGC / 20000)) * far;
+    u.uGain.value = (0.0045 + 0.075 * outside * outside) * (0.6 + 0.4 * Math.min(1, dGC / 20000)) * far * this.engine.skyDim;
     u.uMaxPx.value = (70 + 150 * outside) * ctx.pixelRatio;
     u.uNearFade.value = 250 + 250 * outside;
     this.points.visible = dGC < 4e8; // beyond ~400 Mpc it is far below a pixel

@@ -53,6 +53,8 @@ export class CameraRig {
    * to the focus entity (km); `thrust` is the pilot input (right, up, forward), each in [-1, 1];
    * speed scales with the distance to the reference body so the controls work at every scale.
    */
+  /** Planetarium: camera fixed to a point on a body's surface; yaw/pitch are azimuth/altitude in `frame`. */
+  surface: { frame: Quaternion; offset: Vector3 } | null = null;
   flying = false;
   flyOffset = new Vector3();
   thrust = new Vector3();
@@ -114,6 +116,7 @@ export class CameraRig {
   }
 
   zoom(deltaLn: number): void {
+    if (this.surface) return;
     if (this.flying && !this.flight) { this.throttle = Math.max(-3, Math.min(3, this.throttle - deltaLn * 0.6)); return; }
     if (this.flight) this.flight.lnD1 = this.clampLn(this.flight.lnD1 + deltaLn, this.flight.to);
     else this.lnDistTarget = this.clampLn(this.lnDistTarget + deltaLn, this.focus);
@@ -179,6 +182,16 @@ export class CameraRig {
         this.onArrive?.(f.to);
         f.resolve?.();
       }
+    } else if (this.surface) {
+      _qy.setFromAxisAngle(Y, this.yaw);
+      _qx.setFromAxisAngle(X, this.pitch);
+      this.quaternion.copy(this.surface.frame).multiply(_qy).multiply(_qx);
+      this.lnDist = this.lnDistTarget = Math.log(Math.max(this.surface.offset.length(), 1));
+      this.focusAnchor.copy(this.focus.anchor);
+      this.focusLocal.copy(this.focus.local);
+      this.anchor.copy(this.focusAnchor);
+      this.local.copy(this.focusLocal).add(this.surface.offset);
+      return;
     } else if (this.flying) {
       _qy.setFromAxisAngle(Y, this.yaw);
       _qx.setFromAxisAngle(X, this.pitch);

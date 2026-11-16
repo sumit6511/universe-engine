@@ -109,6 +109,8 @@ export class Engine {
   exposure = 1;
   /** observer speed / c for the relativistic flight view */
   beta = 0;
+  /** 0..1 multiplier on stars and galaxies (daylight washes the sky out in planetarium mode) */
+  skyDim = 1;
   lens!: ShaderPass;
   private size = new Vector2();
   private _cam = new Vector3();

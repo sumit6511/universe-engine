@@ -254,7 +254,7 @@ export class GalaxyField implements System {
     // from inside the Milky Way other galaxies are faint smudges; brighten as the view widens
     const scaleKpc = ctx.distKm / KPC_KM;
     const t = Math.min(1, Math.max(0, Math.log10(Math.max(scaleKpc, 1e-3) / 1) / 2.3));
-    u.uGain.value = 0.45 + 2.3 * t;
+    u.uGain.value = (0.45 + 2.3 * t) * this.engine.skyDim;
     this.camMpc.copy(ctx.rig.anchor).addScaledVector(ctx.rig.local, 1 / PC_KM).multiplyScalar(1e-6);
   }
 

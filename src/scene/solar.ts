@@ -81,6 +81,8 @@ export class SolarSystem implements System {
   beltEpoch = J2000_JD;
   showOrbits = true;
   showBelt = true;
+  /** body id not drawn (the planet we are standing on in planetarium mode) */
+  hideBody: string | null = null;
   private loader = new TextureLoader();
   private sphere: SphereGeometry;
   private jd = J2000_JD;
@@ -296,6 +298,9 @@ export class SolarSystem implements System {
     }
   }
 
+  /** Body-fixed -> world rotation at the current simulation time. */
+  orientation(b: Body): Quaternion { const q = new Quaternion(); this.orient(b, this.jd, q); return q; }
+
   private orient(b: Body, jd: number, q: Quaternion): void {
     const def = b.def;
     if (def.rot) {
@@ -330,7 +335,8 @@ export class SolarSystem implements System {
       const dist = rel.length();
       b.px = (def.radius / Math.max(dist, 1)) * ctx.pixelScale;
       const visible = nearSun && b.px > 0.3;
-      b.mesh.visible = visible || b === this.sun;
+      const hidden = this.hideBody === def.id;
+      b.mesh.visible = (visible || b === this.sun) && !hidden;
       if (b.mesh.visible) {
         b.mesh.position.copy(rel);
         this.orient(b, jd, b.mesh.quaternion);
@@ -346,7 +352,7 @@ export class SolarSystem implements System {
         }
       }
       if (b.atmo) {
-        b.atmo.visible = visible && b.px > 6;
+        b.atmo.visible = visible && b.px > 6 && !hidden;
         if (b.atmo.visible) {
           const top = 1 + def.atmosphere!.height;
           b.atmo.position.copy(rel);
@@ -371,7 +377,7 @@ export class SolarSystem implements System {
       // marker dot while the disc is unresolved
       if (b !== this.sun) {
         const mu = (b.marker.material as ShaderMaterial).uniforms;
-        let alpha = systemAlpha * Math.min(1, Math.max(0, (4.5 - b.px) / 2.5));
+        let alpha = hidden ? 0 : systemAlpha * Math.min(1, Math.max(0, (4.5 - b.px) / 2.5));
         if (b.parent && b.parent !== this.sun) {
           // hide moon markers until the moon is separated from its planet on screen
           const sepPx = (_v.subVectors(b.entity.local, b.parent.entity.local).length() / Math.max(dist, 1)) * ctx.pixelScale;

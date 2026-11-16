@@ -14,6 +14,7 @@ import { SolarSystem } from './scene/solar';
 import { StarField } from './scene/stars';
 import { Guides, Spacecraft } from './scene/extras';
 import { DeepSky } from './scene/deepsky';
+import { Planetarium } from './scene/planetarium';
 import type { ZeldovichResult } from './workers/zeldovich.worker';
 
 export interface SearchEntry { text: string; label: string; sub: string; weight: number; get: () => Entity | null }
@@ -75,12 +76,14 @@ export class App {
   web!: CosmicWeb;
   craft!: Spacecraft;
   deepsky!: DeepSky;
+  sky!: Planetarium;
   guides!: Guides;
   /** entities that are not recreated on demand, by id (for shareable links) */
   private fixed = new Map<string, Entity>();
   search: SearchEntry[] = [];
   selected: Entity | null = null;
   onSelect: ((e: Entity | null) => void) | null = null;
+  onLeaveSky: (() => void) | null = null;
   /** extra label providers / systems registered later (black holes, ...) */
   labelSystems: LabelSystem[] = [];
   private byName = new Map<string, () => Entity | null>();
@@ -130,8 +133,9 @@ export class App {
     this.craft = new Spacecraft(e, this.solar);
     this.guides = new Guides(e, this.solar, this.stars);
     this.deepsky = new DeepSky(e);
-    e.systems.push(this.solar, this.craft, this.stars, this.guides, this.deepsky, this.milkyway, this.galaxies, this.web);
-    this.labelSystems.push(this.solar as LabelSystem, this.stars as LabelSystem, this.milkyway as LabelSystem, this.galaxies as LabelSystem, this.web as LabelSystem, this.craft as LabelSystem, this.guides as LabelSystem, this.deepsky as LabelSystem);
+    this.sky = new Planetarium(e, this.solar);
+    e.systems.push(this.solar, this.sky, this.craft, this.stars, this.guides, this.deepsky, this.milkyway, this.galaxies, this.web);
+    this.labelSystems.push(this.solar as LabelSystem, this.stars as LabelSystem, this.milkyway as LabelSystem, this.galaxies as LabelSystem, this.web as LabelSystem, this.craft as LabelSystem, this.guides as LabelSystem, this.deepsky as LabelSystem, this.sky as LabelSystem);
     progress(0.95, 'Indexing');
     this.buildSearch();
     this.solar.simulate(this.clock.jd);
@@ -160,6 +164,7 @@ export class App {
   // ---------------------------------------------------------------- navigation
   /** Fly to an entity and show its details. */
   goTo(e: Entity, distKm?: number, seconds?: number): Promise<void> {
+    if (this.sky.active) { this.sky.exit(); this.onLeaveSky?.(); }
     this.select(e);
     const idx = this.stars.systemIndexOf(e);
     if (idx > 0 && e.kind === 'exoplanet') this.stars.exoPlanetEntity(idx, parseInt(e.id.split(':')[2], 10)); // ensure position exists
