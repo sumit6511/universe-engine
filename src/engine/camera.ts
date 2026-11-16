@@ -48,9 +48,38 @@ export class CameraRig {
   flight: Flight | null = null;
   fov = 50;
   onArrive: ((e: Entity) => void) | null = null;
+  /**
+   * Free flight: the camera is no longer tied to its focus.  `flyOffset` is its position relative
+   * to the focus entity (km); `thrust` is the pilot input (right, up, forward), each in [-1, 1];
+   * speed scales with the distance to the reference body so the controls work at every scale.
+   */
+  flying = false;
+  flyOffset = new Vector3();
+  thrust = new Vector3();
+  throttle = 0; // log10 multiplier applied to the base speed
+  /** current speed, km/s of simulated space per real second */
+  speedKmS = 0;
 
   get distKm(): number {
     return Math.exp(this.lnDist);
+  }
+
+  /** Enter or leave free flight, keeping the camera where it is. */
+  setFlying(on: boolean): void {
+    if (on === this.flying) return;
+    if (on) {
+      this.flyOffset.set(0, 0, this.distKm).applyQuaternion(this.quaternion);
+      this.throttle = 0;
+    } else {
+      // orbit pose that puts the camera at the same place, looking at the reference body
+      const d = Math.max(this.flyOffset.length(), this.focus.minDist);
+      this.yaw = Math.atan2(this.flyOffset.x, this.flyOffset.z);
+      this.pitch = -Math.asin(Math.max(-1, Math.min(1, this.flyOffset.y / d)));
+      this.lnDist = this.lnDistTarget = Math.log(d);
+      this.speedKmS = 0;
+    }
+    this.thrust.set(0, 0, 0);
+    this.flying = on;
   }
 
   setFocus(e: Entity, distKm?: number): void {
@@ -85,6 +114,7 @@ export class CameraRig {
   }
 
   zoom(deltaLn: number): void {
+    if (this.flying && !this.flight) { this.throttle = Math.max(-3, Math.min(3, this.throttle - deltaLn * 0.6)); return; }
     if (this.flight) this.flight.lnD1 = this.clampLn(this.flight.lnD1 + deltaLn, this.flight.to);
     else this.lnDistTarget = this.clampLn(this.lnDistTarget + deltaLn, this.focus);
   }
@@ -145,9 +175,36 @@ export class CameraRig {
         this.focus = f.to;
         f.to.onFocus?.(true);
         this.lnDist = this.lnDistTarget = this.clampLn(f.lnD1, f.to);
+        if (this.flying) this.flyOffset.set(0, 0, this.distKm).applyQuaternion(_qy.setFromAxisAngle(Y, this.yaw).multiply(_qx.setFromAxisAngle(X, this.pitch)));
         this.onArrive?.(f.to);
         f.resolve?.();
       }
+    } else if (this.flying) {
+      _qy.setFromAxisAngle(Y, this.yaw);
+      _qx.setFromAxisAngle(X, this.pitch);
+      this.quaternion.copy(_qy).multiply(_qx);
+      // base speed: cross the distance to the reference body in about two seconds
+      const d = Math.max(this.flyOffset.length(), 1);
+      const alt = Math.max(d - this.focus.radiusKm, d * 0.02);
+      const v = alt * 0.55 * Math.pow(10, this.throttle);
+      _d.set(this.thrust.x, this.thrust.y, -this.thrust.z);
+      const mag = _d.length();
+      if (mag > 1e-3) {
+        _d.applyQuaternion(this.quaternion);
+        this.flyOffset.addScaledVector(_d, v * dt);
+        // do not fly through the reference body or out of the universe
+        const nd = this.flyOffset.length();
+        if (nd < this.focus.minDist) this.flyOffset.multiplyScalar(this.focus.minDist / Math.max(nd, 1e-9));
+        if (nd > MAX_DIST_KM) this.flyOffset.multiplyScalar(MAX_DIST_KM / nd);
+      }
+      const target = v * Math.min(1, mag);
+      this.speedKmS += (target - this.speedKmS) * (1 - Math.exp(-dt * 6));
+      this.lnDist = this.lnDistTarget = Math.log(Math.max(this.flyOffset.length(), 1));
+      this.focusAnchor.copy(this.focus.anchor);
+      this.focusLocal.copy(this.focus.local);
+      this.anchor.copy(this.focusAnchor);
+      this.local.copy(this.focusLocal).add(this.flyOffset);
+      return;
     } else {
       this.clampDist();
       this.lnDist += (this.lnDistTarget - this.lnDist) * (1 - Math.exp(-dt * 7));

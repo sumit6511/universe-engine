@@ -71,6 +71,7 @@
     <label><input id="set-lens" type="checkbox" checked> Cinematic lens</label>
     <label class="range">Your speed <input id="set-beta" type="range" min="0" max="1000" step="1" value="0"></label>
     <p class="settings-note" id="set-beta-read">at rest · drag to fly at near light speed</p>
+    <button id="btn-fly" type="button" aria-pressed="false">Free flight (F)</button>
     <button id="btn-share" type="button">Copy link to this view</button>
     </div>
     <label class="range">Star brightness <input id="set-mag" type="range" min="4.5" max="9" step="0.1" value="6.3"></label>
@@ -110,7 +111,7 @@
       <li><b>Rendering:</b> three.js (MIT).</li>
     </ul>
     <h2>Keys</h2>
-    <p class="about-keys"><kbd>/</kbd> search · <kbd>space</kbd> pause · <kbd>,</kbd> <kbd>.</kbd> time rate · <kbd>+</kbd> <kbd>−</kbd> zoom · <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> orbit · <kbd>L</kbd> labels · <kbd>H</kbd> hide interface</p>
+    <p class="about-keys"><kbd>/</kbd> search · <kbd>space</kbd> pause · <kbd>,</kbd> <kbd>.</kbd> time rate · <kbd>+</kbd> <kbd>−</kbd> zoom · <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> orbit · <kbd>L</kbd> labels · <kbd>H</kbd> hide interface · Advanced: <kbd>F</kbd> free flight, <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>R</kbd><kbd>V</kbd> to steer</p>
   </section>
 
   <section id="tour" hidden>
@@ -138,6 +139,11 @@
   <div id="reticle" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <div id="hover" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><span id="hover-text"></span></div>
   <div id="warp" hidden><b id="warp-speed"></b><span id="warp-detail"></span></div>
+
+  <div id="flight" hidden>
+    <div class="flight-read"><b id="flight-speed">0 km/s</b><span id="flight-sub">W A S D to fly · R V up/down · drag to look · scroll for power</span></div>
+    <div class="flight-pad"><button id="fly-back" type="button" aria-label="Reverse thrust">▼</button><button id="fly-fwd" type="button" aria-label="Forward thrust">▲</button><button id="fly-exit" type="button">Exit flight</button></div>
+  </div>
 
   <p id="hint">Drag to orbit · scroll or pinch to zoom · click anything to travel there</p>
 

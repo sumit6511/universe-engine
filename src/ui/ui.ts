@@ -137,6 +137,9 @@ export class UI {
     if (ev.key === 'Escape') { this.closePopovers(); (document.activeElement as HTMLElement)?.blur(); if (this.tourIndex >= 0) this.stopTour(); return; }
     if (typing) return;
     const rig = this.app.engine.rig, c = this.app.clock;
+    const key = ev.key.toLowerCase();
+    if (this.app.advanced && !ev.repeat && key === 'f' && !ev.ctrlKey && !ev.metaKey) { this.setFlying(!rig.flying); return; }
+    if (rig.flying && ['w', 'a', 's', 'd', 'r', 'v', 'shift'].includes(key)) { this.keys.add(key); ev.preventDefault(); return; }
     switch (ev.key) {
       case '/': ev.preventDefault(); $<HTMLInputElement>('search-input').focus(); break;
       case ' ': ev.preventDefault(); c.paused = !c.paused; break;
@@ -249,6 +252,16 @@ export class UI {
       $('warp-detail').textContent = `time dilation \u00d7${sig(gamma, 3)} \u00b7 sky ahead blueshifted \u00d7${sig(gamma * (1 + beta), 3)}`;
     });
     $('btn-share').onclick = () => this.share();
+    $('btn-fly').onclick = () => this.setFlying(!app.engine.rig.flying);
+    $('fly-exit').onclick = () => this.setFlying(false);
+    const hold = (id: string, z: number) => {
+      const el = $(id);
+      const set = (v: number) => (ev: Event) => { ev.preventDefault(); this.padThrust = v; };
+      el.addEventListener('pointerdown', set(z)); el.addEventListener('pointerup', set(0)); el.addEventListener('pointerleave', set(0)); el.addEventListener('pointercancel', set(0));
+    };
+    hold('fly-fwd', 1); hold('fly-back', -1);
+    window.addEventListener('keyup', (ev) => this.keys.delete(ev.key.toLowerCase()));
+    window.addEventListener('blur', () => this.keys.clear());
     $('btn-advanced').onclick = () => this.setAdvanced(!app.advanced);
     let stored = false;
     try { stored = localStorage.getItem('ue.advanced') === '1'; } catch { /* storage unavailable */ }
@@ -275,6 +288,32 @@ export class UI {
     else u.searchParams.set('q', name);
     location.replace(u.toString());
   }
+  private keys = new Set<string>();
+  private padThrust = 0;
+  /** Free flight: WASD moves the camera itself instead of orbiting a target. */
+  setFlying(on: boolean): void {
+    const rig = this.app.engine.rig;
+    if (on && (!this.app.advanced || this.controller)) return;
+    if (on) this.stopTour();
+    rig.setFlying(on);
+    this.keys.clear(); this.padThrust = 0;
+    $('flight').hidden = !on;
+    $('btn-fly').setAttribute('aria-pressed', String(on));
+    if (on) this.closePopovers();
+  }
+  private updateFlight(): void {
+    const rig = this.app.engine.rig;
+    if (!rig.flying) return;
+    const k = this.keys;
+    const boost = k.has('shift') ? 4 : 1;
+    rig.thrust.set((k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0), (k.has('r') ? 1 : 0) - (k.has('v') ? 1 : 0), (k.has('w') ? 1 : 0) - (k.has('s') ? 1 : 0) + this.padThrust).multiplyScalar(boost);
+    const v = rig.speedKmS;
+    const c = v / 299792.458;
+    const txt = v < 0.5 ? 'holding position' : c < 0.01 ? `${sig(v, 3)} km/s` : c < 100 ? `${sig(c, 3)} c` : `${sig(c, 3)} \u00d7 light speed`;
+    const el = $('flight-speed');
+    if (el.textContent !== txt) el.textContent = txt;
+  }
+
   /** Switch between the classic experience and the advanced feature set. */
   setAdvanced(on: boolean, remember = true): void {
     const app = this.app;
@@ -290,6 +329,7 @@ export class UI {
     const b = $('btn-advanced');
     b.setAttribute('aria-pressed', String(on));
     b.textContent = on ? 'Advanced \u00b7 on' : 'Advanced';
+    if (!on) this.setFlying(false);
     if (!on) { this.hoverEntity = null; this.app.engine.canvas.style.cursor = ''; }
     // leaving advanced mode while parked on a probe: go home
     if (!on && app.engine.rig.target.kind === 'spacecraft') { const sun = app.find('Sun'); if (sun) app.goTo(sun, 85 * AU_KM); }
@@ -414,6 +454,7 @@ export class UI {
   private tourGo(i: number): void {
     if (i < 0) i = 0;
     if (i >= TOUR.length) { this.stopTour(); return; }
+    this.setFlying(false);
     this.tourIndex = i;
     const step: TourStep = TOUR[i];
     const token = ++this.tourToken;
@@ -504,6 +545,7 @@ export class UI {
         $('set-stats').textContent = `${this.fps.toFixed(0)} fps · ${app.quality.name}${w.n ? ` · web ${w.n}³, σ=${w.sigma.toFixed(2)}` : ''}`;
       }
     }
+    this.updateFlight();
     this.updateHud(ctx);
     this.updateLabels(ctx);
   }
