@@ -168,6 +168,9 @@ export class Engine {
           gl_FragColor = vec4(max(col, 0.0), 1.0);
         }`,
     });
+    // a full-screen pass must not be depth-tested against whatever the target's depth buffer last held
+    this.lens.material.depthTest = false;
+    this.lens.material.depthWrite = false;
     this.composer.addPass(this.lens);
     this.composer.addPass(new OutputPass());
 
